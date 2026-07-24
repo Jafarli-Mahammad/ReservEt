@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: rezerv-az
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    staticPublishPath: .next
+    envVars:
+      # Variables will be filled in via the Render UI
+      # NEXT_PUBLIC_API_URL: ""
+      # NEXT_PUBLIC_MAP_API_KEY: ""
+      # DATABASE_URL: ""
+    healthCheckPath: /
