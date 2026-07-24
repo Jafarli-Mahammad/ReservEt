@@ -1,0 +1,20 @@
+● Hazırladığınız veb saytın məqsədi nədir?
+● Hansı problemi həll edir?
+● Niyə məhz bu mövzunu seçdiniz?
+● Hansı AI alətindən istifadə etdiniz və niyə onu seçdiniz?
+● Hazırlayarkən hansı çətinliklərlə qarşılaşdınız?
+● Layihənizi daha da inkişaf etdirmək üçün gələcəkdə hansı
+funksiyaları əlavə etmək istərdiniz?
+
+1. Peşə sahibləri və müştəriləri üçün randevu almaq üçün websayt
+2. Qarışıq iş günü/zəng whatsapp mesajlarından qurtulmaq üçün pratik çözüm
+yaradır, müştərilər öz adlarını istənilən saata/günə qeyd edir. peşə sahibinə
+bildirim gedir və o randevunu görür
+3. Bu sahədə boşluq gördüm
+4. Chat gpt go + Antigravity + Netlify
+5. Antigravity ilk başda düzgün qurmadı web saytı, daha sonra prompt yazarkən düzəltdi
+lakin öz özünə digər səhifələrin detaylarını dəyişirdi və
+bəzi sözləri ingiliscə yazır, connectorla bağlaya bilmir və s
+6. Gələcəkdə abunəlik, qara siyahı, ödəniş sistemi, whatsapp bot,
+beh prepayment, peşə sahibləri üçün öz randevu səhifələrinə
+düzəliş vermək tema seçmək, əlavələr etmək üçün panel funksiyaları əlavə etmək olar

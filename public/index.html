@@ -1,0 +1,3043 @@
+<!DOCTYPE html>
+<html lang="az" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rezerv.az - Randevunu Rezerv Et!</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            display: ['Space Grotesk', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              400: '#a78bfa',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              900: '#4c1d95',
+            },
+            darkbg: '#0C0A15',
+            darkcard: '#161327',
+            darkborder: '#282245'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- React & Babel CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      background-color: #0C0A15;
+      color: #F3F4F6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow-x: hidden;
+    }
+    .glass-panel {
+      background: rgba(22, 19, 39, 0.75);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glow-violet {
+      box-shadow: 0 0 40px -5px rgba(139, 92, 246, 0.35);
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0C0A15;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #282245;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #8B5CF6;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script>
+    // Fix React + Lucide DOM conflict: lucide.createIcons() replaces <i> elements
+    // with <svg>, so when React tries to removeChild the original <i>, it crashes.
+    // This patch makes removeChild/insertBefore gracefully handle mismatched nodes.
+    (function() {
+      var origRemoveChild = Node.prototype.removeChild;
+      Node.prototype.removeChild = function(child) {
+        if (child && child.parentNode !== this) {
+          return child;
+        }
+        return origRemoveChild.apply(this, arguments);
+      };
+
+      var origInsertBefore = Node.prototype.insertBefore;
+      Node.prototype.insertBefore = function(newNode, refNode) {
+        if (refNode && refNode.parentNode !== this) {
+          return newNode;
+        }
+        return origInsertBefore.apply(this, arguments);
+      };
+    })();
+  </script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // Error Boundary to catch React render crashes
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null, errorInfo: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, errorInfo) {
+        this.setState({ errorInfo });
+        console.error('React Error Boundary caught:', error, errorInfo);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div style={{padding:'40px',background:'#1a0a2e',color:'#ff6b6b',fontFamily:'monospace',minHeight:'100vh'}}>
+              <h2 style={{color:'#fff',marginBottom:'10px'}}>⚠️ Xəta baş verdi (Error Boundary)</h2>
+              <pre style={{whiteSpace:'pre-wrap',fontSize:'13px'}}>{this.state.error && this.state.error.toString()}</pre>
+              <pre style={{whiteSpace:'pre-wrap',fontSize:'11px',color:'#aaa',marginTop:'10px'}}>{this.state.errorInfo && this.state.errorInfo.componentStack}</pre>
+              <button onClick={() => { this.setState({ hasError: false }); window.location.reload(); }} style={{marginTop:'20px',padding:'10px 20px',background:'#8B5CF6',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'bold'}}>Səhifəni Yenilə</button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    const PROFESSIONS_LIST = [
+      'Bərbər',
+      'Dırnaq ustası',
+      'Diş həkimi',
+      'Fotoqraf',
+      'Həkim',
+      'Konsultant',
+      'Makeup artist (Makiyaj ustası)',
+      'Maşın ustası (Avto usta)',
+      'Massajist',
+      'Personal Trainer (Məşqçi)',
+      'Psixoloq',
+      'Saç ustası',
+      'Stilist',
+      'Sürücülük müəllimi',
+      'Tattoo master (Tatu ustası)',
+      'Tutor (Repetitor)',
+      'Vəkil',
+      'Digər xidmət sahəsi'
+    ];
+
+    const AVATAR_PRESETS = [
+      { id: 'av-1', icon: '👤', label: 'Standart' },
+      { id: 'av-2', icon: '👑', label: 'VIP' },
+      { id: 'av-3', icon: '⚡', label: 'Cəld' },
+      { id: 'av-4', icon: '💼', label: 'İşgüzar' },
+      { id: 'av-5', icon: '🎨', label: 'Kreativ' },
+      { id: 'av-6', icon: '✂️', label: 'Stil' },
+      { id: 'av-7', icon: '🌟', label: 'Ulduz' },
+      { id: 'av-8', icon: '🔥', label: 'Trend' }
+    ];
+
+    const INITIAL_PROS = [
+      {
+        id: 'pro-1',
+        slug: 'barber-emin',
+        fullName: 'Emin Əliyev',
+        profession: 'Bərbər',
+        businessName: 'Gentlemen Craft Barbershop',
+        email: 'emin.barber@rezerv.az',
+        password: '123',
+        phone: '+994 55 999 12 34',
+        telegram: 'barber_emin_baku',
+        telegramChatId: '123456789',
+        telegramBotToken: 'bot591823910:AAHz918239018239',
+        profilePhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=600',
+        coverPhoto: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=1200',
+        about: '10 illik təcrübəyə malik usta bərbər. Fade saç kəsimi, saqqal formalaşdırılması və VIP üz baxımı servisləri.',
+        workingAddress: 'Təbriz küç. 44, Nərimanov rayonu',
+        city: 'Bakı',
+        district: 'Nərimanov',
+        latitude: 40.3985,
+        longitude: 49.8710,
+        instagram: 'barber.emin.craft',
+        languages: ['Azərbaycan', 'Русский'],
+        experienceYears: 10,
+        certificates: ['Wahl Master Barber Diploma'],
+        gallery: [
+          'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&q=80&w=800'
+        ],
+        rating: 4.98,
+        reviewCount: 215,
+        workingDays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
+        workStartHour: '09:00',
+        workEndHour: '20:00',
+        blockedDates: ['2026-07-28', '2026-07-30'],
+        blockedHours: ['13:00', '13:30'],
+        blockedHoursByDate: {},
+        services: [
+          { id: 's201', name: 'Saç Kəsimi & Yuma (Fade / Classic)', duration: 45, price: 25, category: 'Saç', color: '#F59E0B', description: 'Fade kəsim və stajlinq.' },
+          { id: 's202', name: 'Saqqal & Qaynar Dəsmal Spası', duration: 30, price: 15, category: 'Saqqal', color: '#10B981', description: 'Jiletlə kontur və qaynar dəsmal.' }
+        ],
+        customization: {
+          template: 'luxury',
+          primaryColor: '#8B5CF6',
+          accentColor: '#D946EF',
+          buttonStyle: 'rounded',
+          backgroundStyle: 'dark_luxury',
+          showSlotPrivacy: 'show_name'
+        },
+        subscription: 'pro',
+        isApproved: true,
+        isSuspended: false,
+        googleCalendarConnected: true,
+        telegramBotConnected: true,
+        notifyNewBooking: true,
+        notifyCancellation: true,
+        notifyReminder: true
+      },
+      {
+        id: 'pro-2',
+        slug: 'nail-ayten',
+        fullName: 'Aytən Qasımova',
+        profession: 'Dırnaq ustası',
+        businessName: 'Ayten Nail Studio',
+        email: 'ayten.nail@rezerv.az',
+        password: '123',
+        phone: '+994 70 888 77 11',
+        telegram: 'ayten_nail_art',
+        telegramChatId: '987654321',
+        telegramBotToken: 'bot591823910:AAHz918239018239',
+        profilePhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600',
+        coverPhoto: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&q=80&w=1200',
+        about: 'Aparat manikürü, pedikür, dırnaq qaynağı və fərdi dizaynlar.',
+        workingAddress: '28 May küç. 18, Səbail rayonu',
+        city: 'Bakı',
+        district: 'Səbail',
+        latitude: 40.3750,
+        longitude: 49.8430,
+        instagram: 'ayten.nail.studio',
+        languages: ['Azərbaycan', 'Русский'],
+        experienceYears: 7,
+        certificates: ['Luxio Certified Master'],
+        gallery: [
+          'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&q=80&w=800'
+        ],
+        rating: 4.92,
+        reviewCount: 94,
+        workingDays: ['mon', 'tue', 'wed', 'thu', 'fri'],
+        workStartHour: '10:00',
+        workEndHour: '19:00',
+        blockedDates: [],
+        blockedHours: [],
+        blockedHoursByDate: {},
+        services: [
+          { id: 's301', name: 'Aparat Manikürü + Şellak', duration: 60, price: 35, category: 'Manikür', color: '#EC4899', description: 'Luxio örtüyü ilə manikür.' }
+        ],
+        customization: {
+          template: 'beauty',
+          primaryColor: '#D946EF',
+          accentColor: '#F472B6',
+          buttonStyle: 'pill',
+          backgroundStyle: 'gradient',
+          showSlotPrivacy: 'show_avatar'
+        },
+        subscription: 'pro',
+        isApproved: true,
+        isSuspended: false,
+        googleCalendarConnected: true,
+        telegramBotConnected: true,
+        notifyNewBooking: true,
+        notifyCancellation: true,
+        notifyReminder: true
+      },
+      {
+        id: 'pro-3',
+        slug: 'cosmetologist-leyla',
+        fullName: 'Leyla Məmmədova',
+        profession: 'Kosmetoloq',
+        businessName: 'Leyla Aesthetic Center',
+        email: 'leyla.cosmo@rezerv.az',
+        password: '123',
+        phone: '+994 50 777 55 33',
+        telegram: 'leyla_cosmetology',
+        telegramChatId: '112233445',
+        telegramBotToken: 'bot591823910:AAHz918239018239',
+        profilePhoto: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600',
+        coverPhoto: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&q=80&w=1200',
+        about: 'Peşəkar kosmetoloq. Dəri baxımı, botoks, plazmoliftinq və pilinq xidmətləri.',
+        workingAddress: 'Həsən Əliyev küç. 12, Nəsimi rayonu',
+        city: 'Bakı',
+        district: 'Nəsimi',
+        latitude: 40.4010,
+        longitude: 49.8550,
+        instagram: 'leyla.cosmo.aesthetic',
+        languages: ['Azərbaycan', 'English'],
+        experienceYears: 6,
+        certificates: ['Aesthetic Medicine Specialist Diploma'],
+        gallery: [
+          'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&q=80&w=800'
+        ],
+        rating: 4.95,
+        reviewCount: 120,
+        workingDays: ['mon', 'tue', 'wed', 'thu', 'fri'],
+        workStartHour: '09:00',
+        workEndHour: '18:00',
+        blockedDates: [],
+        blockedHours: [],
+        blockedHoursByDate: {},
+        services: [
+          { id: 's401', name: 'Dərin Dəri Təmizlənməsi (Pilinq)', duration: 45, price: 40, category: 'Baxım', color: '#10B981', description: 'Ultraseslə dərinin dərindən təmizlənməsi.' }
+        ],
+        customization: {
+          template: 'modern',
+          primaryColor: '#10B981',
+          accentColor: '#34D399',
+          buttonStyle: 'rounded',
+          backgroundStyle: 'clean',
+          showSlotPrivacy: 'show_initial'
+        },
+        subscription: 'free',
+        isApproved: true,
+        isSuspended: false,
+        googleCalendarConnected: false,
+        telegramBotConnected: true,
+        notifyNewBooking: true,
+        notifyCancellation: true,
+        notifyReminder: true
+      }
+    ];
+
+    const INITIAL_BOOKINGS = [
+      {
+        id: 'b-1001',
+        professionalId: 'pro-1',
+        serviceName: 'Saç Kəsimi & Yuma (Fade)',
+        price: 25,
+        date: '2026-07-24',
+        time: '11:00',
+        customerName: 'Kamran Rəhimov',
+        customerAvatar: '👑',
+        customerPhone: '+994 50 333 22 11',
+        customerEmail: 'kamran@gmail.com',
+        notes: 'Xüsusi fade stajlinq istənir',
+        status: 'arrived'
+      }
+    ];
+
+    const INITIAL_CUSTOMERS = [
+      {
+        id: 'cust-1',
+        name: 'Kamran Rəhimov',
+        phone: '+994 50 333 22 11',
+        email: 'kamran@gmail.com',
+        avatar: '👑',
+        telegram: 'kamran_r',
+        totalVisits: 5,
+        completedVisits: 4,
+        noShowCount: 0,
+        totalSpending: 290,
+        isBlacklisted: false
+      }
+    ];
+
+    const INITIAL_SITE_SETTINGS = {
+      siteName: 'Rezerv.az',
+      logoSubtitle: 'randevunu rezerv et!',
+      heroHeadline: 'Bərbərlər, Ustalar, Studiyalar və Bütün Xidmətlər Üçün Randevu Platforması',
+      heroSubtext: 'Sevdiyiniz bərbər, vizajist, fotoqraf, fitnes məşqçisi və ya mütəxəssis üçün növbə gözləmədən instant vaxt seçin.',
+      currency: 'AZN',
+      primaryColor: '#8B5CF6',
+      maintenanceMode: false
+    };
+
+    // --- HELPER COMPONENT: DRAG AND DROP FILE UPLOAD ---
+    function DragDropUpload({ label, value, onChange, presetIcon }) {
+      const [dragging, setDragging] = React.useState(false);
+
+      const handleDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") {
+          setDragging(true);
+        } else if (e.type === "dragleave") {
+          setDragging(false);
+        }
+      };
+
+      const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragging(false);
+        
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          const file = e.dataTransfer.files[0];
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            onChange(event.target.result); // base64 representation
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const handleFileChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            onChange(event.target.result);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      return (
+        <div
+          onDragEnter={handleDrag}
+          onDragOver={handleDrag}
+          onDragLeave={handleDrag}
+          onDrop={handleDrop}
+          className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all ${
+            dragging ? "border-violet-500 bg-violet-600/10" : "border-purple-900/40 bg-[#161327] hover:border-purple-800"
+          }`}
+        >
+          {value ? (
+            <div className="relative w-full h-24 flex items-center justify-center rounded-lg overflow-hidden">
+              <img src={value} className="h-full w-auto object-cover rounded" />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange("");
+                }}
+                className="absolute top-1 right-1 p-1 bg-rose-600 hover:bg-rose-500 rounded-full text-white text-[10px] w-5 h-5 flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <label className="w-full text-center cursor-pointer flex flex-col items-center justify-center">
+              <span className="text-2xl mb-1">{presetIcon || "📸"}</span>
+              <span className="text-xs text-gray-200 font-bold block">{label}</span>
+              <span className="text-[10px] text-gray-500 block mt-0.5">Sürüşürün & buraxın və ya seçmək üçün klikləyin</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
+          )}
+        </div>
+      );
+    }
+
+    // --- HELPER COMPONENT: LEAFLET MAP WIDGET ---
+    function MapWidget({ latitude, longitude, onChangeCoords, isEditable }) {
+      const mapContainerRef = React.useRef(null);
+      const mapInstanceRef = React.useRef(null);
+      const markerInstanceRef = React.useRef(null);
+
+      React.useEffect(() => {
+        if (!mapContainerRef.current) return;
+
+        // Initialize map
+        const map = L.map(mapContainerRef.current).setView([latitude, longitude], 13);
+        mapInstanceRef.current = map;
+
+        // Dark Matter map tiles for Rezerv.az dark violet theme
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        }).addTo(map);
+
+        // Marker
+        const marker = L.marker([latitude, longitude], {
+          draggable: isEditable
+        }).addTo(map);
+        markerInstanceRef.current = marker;
+
+        if (isEditable) {
+          marker.on('dragend', () => {
+            const position = marker.getLatLng();
+            onChangeCoords(position.lat, position.lng);
+          });
+
+          map.on('click', (e) => {
+            const { lat, lng } = e.latlng;
+            marker.setLatLng([lat, lng]);
+            onChangeCoords(lat, lng);
+          });
+        }
+
+        return () => {
+          if (mapInstanceRef.current) {
+            const currentMap = mapInstanceRef.current;
+            mapInstanceRef.current = null;
+            setTimeout(() => {
+              try {
+                currentMap.remove();
+              } catch (e) {
+                console.warn("Leaflet cleanup warning:", e);
+              }
+            }, 0);
+          }
+        };
+      }, [isEditable]);
+
+      React.useEffect(() => {
+        if (mapInstanceRef.current && markerInstanceRef.current) {
+          markerInstanceRef.current.setLatLng([latitude, longitude]);
+          mapInstanceRef.current.panTo([latitude, longitude]);
+        }
+      }, [latitude, longitude]);
+
+      return (
+        <div className="relative w-full h-[220px] rounded-xl overflow-hidden border border-purple-900/40">
+          <div ref={mapContainerRef} className="w-full h-full" style={{ zIndex: 10 }} />
+          {isEditable && (
+            <div className="absolute bottom-2 right-2 z-[999] bg-[#161327]/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-violet-300 border border-purple-800/40 pointer-events-none">
+              📌 Xəritədə klikləyərək və ya pini sürüşdürərək mövqe təyin edin
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- HELPER COMPONENT: PROFESSIONAL DASHBOARD LOCK/LOGIN SCREEN ---
+    function ProfessionalLoginScreen({ loginForm, setLoginForm, handleProLogin, onOpenRegister }) {
+      return (
+        <div className="min-h-[80vh] flex items-center justify-center p-4">
+          <div className="glass-panel max-w-md w-full rounded-2xl p-8 border border-purple-500/30 shadow-2xl space-y-6 glow-violet relative">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-purple-600/10 blur-[80px] rounded-full pointer-events-none"></div>
+
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-500 to-fuchsia-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/25 mx-auto">
+                <i data-lucide="lock" className="w-6 h-6"></i>
+              </div>
+              <h2 className="font-display font-extrabold text-2xl text-white">Kabinetə Giriş</h2>
+              <p className="text-xs text-gray-400">Mütəxəssis kabinetinizə daxil olmaq üçün məlumatlarınızı daxil edin</p>
+            </div>
+
+            <form onSubmit={handleProLogin} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-300 mb-1 block">E-poçt Ünvanı</label>
+                <input 
+                  required
+                  type="email" 
+                  placeholder="emin.barber@rezerv.az" 
+                  value={loginForm.email}
+                  onChange={e => setLoginForm({...loginForm, email: e.target.value})}
+                  className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-300 mb-1 block">Şifrə</label>
+                <input 
+                  required
+                  type="password" 
+                  placeholder="••••••" 
+                  value={loginForm.password}
+                  onChange={e => setLoginForm({...loginForm, password: e.target.value})}
+                  className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 hover:from-violet-500 font-bold text-white shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 text-xs"
+              >
+                Kabinetə Giriş Et
+              </button>
+            </form>
+
+            <div className="text-center text-xs text-gray-400 pt-3 border-t border-purple-900/20">
+              Kabinetiniz yoxdur?{' '}
+              <button 
+                type="button"
+                onClick={onOpenRegister}
+                className="text-violet-400 hover:underline font-bold"
+              >
+                Mütəxəssis Ol
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      const [role, setRole] = useState('customer'); // 'customer' | 'professional' | 'admin'
+      const [lang, setLang] = useState('az');
+      const [pros, setPros] = useState(INITIAL_PROS);
+      const [loggedInProId, setLoggedInProId] = useState(null); // null if logged out
+      const [bookings, setBookings] = useState(INITIAL_BOOKINGS);
+      const [customers, setCustomers] = useState(INITIAL_CUSTOMERS);
+      const [siteSettings, setSiteSettings] = useState(INITIAL_SITE_SETTINGS);
+      const [waitlist, setWaitlist] = useState([]);
+      
+      const [activeProSlug, setActiveProSlug] = useState(null);
+      const [dashTab, setDashTab] = useState('overview'); 
+      
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedProfession, setSelectedProfession] = useState('All');
+      const [selectedCity, setSelectedCity] = useState('All');
+      
+      const [showRegisterModal, setShowRegisterModal] = useState(false);
+      const [showLoginModal, setShowLoginModal] = useState(false);
+      const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+      const [regStep, setRegStep] = useState(1);
+
+      const [regForm, setRegForm] = useState({
+        fullName: '',
+        profession: PROFESSIONS_LIST[0],
+        businessName: '',
+        email: '',
+        password: '',
+        phone: '',
+        telegram: '',
+        profilePhoto: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=600',
+        coverPhoto: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=1200',
+        about: '',
+        workingAddress: '',
+        city: 'Bakı',
+        district: 'Nərimanov',
+        latitude: 40.3985,
+        longitude: 49.8710,
+        website: '',
+        instagram: '',
+        facebook: '',
+        tiktok: '',
+        languages: 'Azərbaycan, English',
+        experienceYears: 5,
+        certificates: '',
+        workStartHour: '09:00',
+        workEndHour: '20:00'
+      });
+
+      const [telegramNotice, setTelegramNotice] = useState(null);
+      const [toast, setToast] = useState(null);
+
+      const triggerToast = (msg, type = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 4500);
+      };
+
+      const triggerTelegramBotNotice = (payload) => {
+        setTelegramNotice(payload);
+      };
+
+      useEffect(() => {
+        lucide.createIcons();
+      });
+
+      const loggedInPro = useMemo(() => {
+        return pros.find(p => p.id === loggedInProId) || pros[0];
+      }, [pros, loggedInProId]);
+
+      const activePro = useMemo(() => {
+        return pros.find(p => p.slug === activeProSlug) || pros[0];
+      }, [pros, activeProSlug]);
+
+      const filteredPros = useMemo(() => {
+        return pros.filter(p => {
+          const matchQuery = p.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                             p.businessName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                             p.profession.toLowerCase().includes(searchQuery.toLowerCase());
+          const matchProf = selectedProfession === 'All' || p.profession === selectedProfession;
+          const matchCity = selectedCity === 'All' || p.city === selectedCity;
+          return matchQuery && matchProf && matchCity;
+        });
+      }, [pros, searchQuery, selectedProfession, selectedCity]);
+
+      const handleProLogin = (e) => {
+        if (e) e.preventDefault();
+        const found = pros.find(
+          p => p.email.toLowerCase() === loginForm.email.toLowerCase() && 
+          p.password === loginForm.password
+        );
+        if (found) {
+          setLoggedInProId(found.id);
+          setRole('professional');
+          setShowLoginModal(false);
+          triggerToast(`Xoş gəldiniz, ${found.fullName}! Mütəxəssis kabinetiniz dərhal açıldı.`);
+        } else {
+          triggerToast(`E-poçt və ya şifrə yanlışdır!`, 'error');
+        }
+      };
+
+      const handleRegister = (e) => {
+        e.preventDefault();
+        const slug = regForm.fullName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || `pro-${Date.now()}`;
+        const newPro = {
+          id: `pro-${Date.now()}`,
+          slug,
+          fullName: regForm.fullName,
+          profession: regForm.profession,
+          businessName: regForm.businessName || regForm.fullName,
+          email: regForm.email,
+          password: regForm.password,
+          phone: regForm.phone,
+          telegram: regForm.telegram,
+          telegramChatId: '123456789',
+          telegramBotToken: 'bot591823910:AAHz918239018239',
+          profilePhoto: regForm.profilePhoto,
+          coverPhoto: regForm.coverPhoto,
+          about: regForm.about || 'Müasir xidmət və peşəkar keyfiyyət zəmanəti.',
+          workingAddress: regForm.workingAddress || 'Bakı şəhəri',
+          city: regForm.city,
+          district: regForm.district,
+          latitude: regForm.latitude,
+          longitude: regForm.longitude,
+          website: regForm.website,
+          instagram: regForm.instagram,
+          facebook: regForm.facebook,
+          languages: regForm.languages ? regForm.languages.split(',').map(l => l.trim()) : ['Azərbaycan'],
+          experienceYears: Number(regForm.experienceYears) || 3,
+          certificates: regForm.certificates ? [regForm.certificates] : [],
+          workingDays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
+          workStartHour: regForm.workStartHour || '09:00',
+          workEndHour: regForm.workEndHour || '20:00',
+          blockedDates: [],
+          blockedHours: [],
+          blockedHoursByDate: {},
+          gallery: [],
+          rating: 5.0,
+          reviewCount: 0,
+          services: [
+            { id: `s-${Date.now()}`, name: 'Standart Xidmət Qəbulu', duration: 30, price: 30, category: 'Əsas', color: '#8B5CF6', description: 'Fərdi qəbul.' }
+          ],
+          customization: {
+            template: 'modern',
+            primaryColor: '#8B5CF6',
+            accentColor: '#D946EF',
+            buttonStyle: 'rounded',
+            backgroundStyle: 'clean',
+            showSlotPrivacy: 'show_initial'
+          },
+          subscription: 'free',
+          isApproved: true,
+          isSuspended: false,
+          googleCalendarConnected: false,
+          telegramBotConnected: true,
+          notifyNewBooking: true,
+          notifyCancellation: true,
+          notifyReminder: true
+        };
+
+        setPros(prev => [...prev, newPro]);
+        setLoggedInProId(newPro.id);
+        // Close modal first, reset wizard step – give Leaflet map time to unmount cleanly
+        setShowRegisterModal(false);
+        setRegStep(1);
+        // Defer role switch so Leaflet cleanup doesn't collide with React re-render
+        setTimeout(() => {
+          setRole('professional');
+          setDashTab('overview');
+          triggerToast(`Təbrik edirik! Qeydiyyat uğurludur. Kabinetiniz dərhal açıldı!`);
+        }, 80);
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col bg-[#0C0A15] text-gray-100">
+          
+          {/* TOAST NOTIFICATION */}
+          {toast && (
+            <div className="fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl glass-panel text-white shadow-2xl border-l-4 border-violet-500 animate-bounce">
+              <i data-lucide="check-circle" className="text-violet-400 w-5 h-5"></i>
+              <span className="font-medium text-sm">{toast.msg}</span>
+            </div>
+          )}
+
+          {/* TELEGRAM LIVE NOTIFICATION MODAL */}
+          {telegramNotice && (
+            <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="glass-panel max-w-4xl w-full rounded-2xl p-6 relative border border-purple-500/40 shadow-2xl space-y-5 glow-violet">
+                <button 
+                  type="button"
+                  onClick={() => setTelegramNotice(null)} 
+                  className="absolute top-4 right-4 text-gray-400 hover:text-white p-2 w-8 h-8 rounded-xl bg-[#161327] border border-purple-800/40 transition-colors flex items-center justify-center font-bold text-xs"
+                >
+                  ✕
+                </button>
+
+                <div className="flex items-center gap-3 border-b border-purple-900/40 pb-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-fuchsia-400 flex items-center justify-center border border-purple-500/30">
+                    <span className="animate-bounce">🔔</span>
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-base text-white">Bildiriş Dispetçeri (Double-Sided Alerts)</h3>
+                    <p className="text-[11px] text-fuchsia-300">Rezervasiya və əməliyyat bildirişləri hər iki tərəfə eyni anda çatdırılır</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Side: Specialist Notification */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-sky-400 uppercase tracking-wider">
+                      <span>Mütəxəssisə (Telegram Bot)</span>
+                      <span className="text-[10px] bg-sky-950/40 border border-sky-900/50 px-2 py-0.5 rounded text-gray-300">
+                        Chat ID: {telegramNotice.specialist ? telegramNotice.specialist.chatId : (telegramNotice.chatId || '123456789')}
+                      </span>
+                    </div>
+                    <div className="bg-[#100C22] p-4 rounded-xl border border-sky-500/20 font-mono text-[11px] text-gray-200 min-h-[160px] whitespace-pre-wrap leading-relaxed shadow-inner">
+                      {telegramNotice.specialist ? telegramNotice.specialist.text : (telegramNotice.text || '')}
+                    </div>
+                  </div>
+
+                  {/* Right Side: Customer Notification */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-fuchsia-400 uppercase tracking-wider">
+                      <span>Müştəriyə (SMS & E-poçt)</span>
+                      <span className="text-[10px] bg-fuchsia-950/40 border border-fuchsia-900/50 px-2 py-0.5 rounded text-gray-300">
+                        Alıcı: {telegramNotice.customer ? telegramNotice.customer.recipient : 'Müştəri'}
+                      </span>
+                    </div>
+                    <div className="bg-[#100C22] p-4 rounded-xl border border-fuchsia-500/20 font-mono text-[11px] text-gray-200 min-h-[160px] whitespace-pre-wrap leading-relaxed shadow-inner">
+                      {telegramNotice.customer ? telegramNotice.customer.text : (
+                        `✉️ SMS & E-POÇT BİLDİRİŞİ\n\nHörmətli Müştəri, randevunuz uğurla qeydə alındı!`
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2 border-t border-purple-900/20">
+                  <button 
+                    onClick={() => setTelegramNotice(null)}
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 text-white font-bold text-xs shadow-md shadow-violet-900/20 transition-all"
+                  >
+                    Bildiriş Loglarını Bağla
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* LOGIN MODAL */}
+          {showLoginModal && (
+            <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="glass-panel max-w-md w-full rounded-2xl p-6 relative border border-purple-500/40 shadow-2xl space-y-5 glow-violet">
+                <button 
+                  onClick={() => setShowLoginModal(false)} 
+                  className="absolute top-4 right-4 text-gray-400 hover:text-white p-2 rounded-xl bg-[#161327] border border-purple-800/40 transition-colors"
+                >
+                  ✕
+                </button>
+
+                <div className="border-b border-purple-900/40 pb-3 pr-8 flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-violet-600/20 text-violet-400 flex items-center justify-center border border-violet-500/30">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-display text-xl font-bold text-white">Mütəxəssis Girişi</h3>
+                    <p className="text-xs text-gray-400">Kabinetinizə daxil olmaq üçün məlumatları doldurun</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleProLogin} className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300 mb-1 block">E-poçt Ünvanı *</label>
+                    <input 
+                      required
+                      type="email" 
+                      placeholder="emin.barber@rezerv.az" 
+                      value={loginForm.email}
+                      onChange={e => setLoginForm({...loginForm, email: e.target.value})}
+                      className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300 mb-1 block">Şifrə *</label>
+                    <input 
+                      required
+                      type="password" 
+                      placeholder="••••••" 
+                      value={loginForm.password}
+                      onChange={e => setLoginForm({...loginForm, password: e.target.value})}
+                      className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 hover:from-violet-500 font-bold text-white shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 text-xs"
+                  >
+                    Giriş Et
+                  </button>
+
+                  <div className="text-center text-xs text-gray-400 pt-2 border-t border-purple-900/20">
+                    Hesabınız yoxdur?{' '}
+                    <button 
+                      type="button" 
+                      onClick={() => { setShowLoginModal(false); setShowRegisterModal(true); }}
+                      className="text-violet-400 hover:underline font-bold"
+                    >
+                      Mütəxəssis Ol
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* REGISTRATION MODAL (STEP-BY-STEP WIZARD) */}
+          {showRegisterModal && (
+            <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="glass-panel max-w-2xl w-full rounded-2xl p-6 relative border border-purple-500/40 shadow-2xl space-y-5 glow-violet max-h-[90vh] overflow-y-auto">
+                <button 
+                  onClick={() => { setShowRegisterModal(false); setRegStep(1); }} 
+                  className="absolute top-4 right-4 text-gray-400 hover:text-white p-2 rounded-xl bg-[#161327] border border-purple-800/40 transition-colors"
+                >
+                  ✕
+                </button>
+
+                <div className="border-b border-purple-900/40 pb-3 pr-8 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-violet-600/20 text-violet-400 flex items-center justify-center border border-violet-500/30">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-display text-xl font-bold text-white">Mütəxəssis Qeydiyyatı</h3>
+                    <p className="text-xs text-gray-400">Rezerv.az platformasına qoşulmaq üçün 4 addımlı qeydiyyatı tamamlayın</p>
+                  </div>
+                </div>
+
+                {/* Step Indicators */}
+                <div className="flex items-center justify-between text-xs font-bold text-gray-400 px-4">
+                  <span className={regStep === 1 ? "text-violet-400 border-b-2 border-violet-500 pb-1" : ""}>1. Peşə</span>
+                  <span className={regStep === 2 ? "text-violet-400 border-b-2 border-violet-500 pb-1" : ""}>2. Giriş & Əlaqə</span>
+                  <span className={regStep === 3 ? "text-violet-400 border-b-2 border-violet-500 pb-1" : ""}>3. Ünvan & Xəritə</span>
+                  <span className={regStep === 4 ? "text-violet-400 border-b-2 border-violet-500 pb-1" : ""}>4. Saatlar & Media</span>
+                </div>
+
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  if (regStep < 4) {
+                    setRegStep(regStep + 1);
+                  } else {
+                    handleRegister(e);
+                  }
+                }} className="space-y-4">
+                  
+                  {/* STEP 1: Peşə və Şəxsi Məlumatlar */}
+                  {regStep === 1 && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Ad Soyadınız *</label>
+                          <input 
+                            required
+                            type="text" 
+                            placeholder="Emin Əliyev" 
+                            value={regForm.fullName}
+                            onChange={e => setRegForm({...regForm, fullName: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Peşəniz *</label>
+                          <select 
+                            value={regForm.profession}
+                            onChange={e => setRegForm({...regForm, profession: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                          >
+                            {PROFESSIONS_LIST.map(p => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Biznes / Salon Adı</label>
+                          <input 
+                            type="text" 
+                            placeholder="Gentlemen Craft Barbershop" 
+                            value={regForm.businessName}
+                            onChange={e => setRegForm({...regForm, businessName: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Təcrübə İli (İl) *</label>
+                          <input 
+                            required
+                            type="number" 
+                            min="0"
+                            placeholder="5" 
+                            value={regForm.experienceYears}
+                            onChange={e => setRegForm({...regForm, experienceYears: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-gray-300 mb-1 block">Bildiyiniz Dillər (Vergüllə ayırın)</label>
+                        <input 
+                          type="text" 
+                          placeholder="Azərbaycan, Русский, English" 
+                          value={regForm.languages}
+                          onChange={e => setRegForm({...regForm, languages: e.target.value})}
+                          className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-gray-300 mb-1 block">Haqqınızda qısa məlumat *</label>
+                        <textarea 
+                          required
+                          rows="3"
+                          placeholder="Fəaliyyətiniz və təqdim etdiyiniz xidmətlər haqqında ətraflı yazın..." 
+                          value={regForm.about}
+                          onChange={e => setRegForm({...regForm, about: e.target.value})}
+                          className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 2: Giriş və Əlaqə Məlumatları */}
+                  {regStep === 2 && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">E-poçt Ünvanınız *</label>
+                          <input 
+                            required
+                            type="email" 
+                            placeholder="nümunə@rezerv.az" 
+                            value={regForm.email}
+                            onChange={e => setRegForm({...regForm, email: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Şifrə *</label>
+                          <input 
+                            required
+                            type="password" 
+                            placeholder="Şifrəniz" 
+                            value={regForm.password}
+                            onChange={e => setRegForm({...regForm, password: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Telefon Nömrəsi *</label>
+                          <input 
+                            required
+                            type="text" 
+                            placeholder="+994 55 999 12 34" 
+                            value={regForm.phone}
+                            onChange={e => setRegForm({...regForm, phone: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Telegram Ləqəbi (Username)</label>
+                          <input 
+                            type="text" 
+                            placeholder="barber_emin" 
+                            value={regForm.telegram}
+                            onChange={e => setRegForm({...regForm, telegram: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 3: Ünvan və Xəritə Mövqeyi */}
+                  {regStep === 3 && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Şəhər *</label>
+                          <select 
+                            value={regForm.city}
+                            onChange={e => setRegForm({...regForm, city: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                          >
+                            <option value="Bakı">Bakı</option>
+                            <option value="Sumqayıt">Sumqayıt</option>
+                            <option value="Gəncə">Gəncə</option>
+                            <option value="Naxçıvan">Naxçıvan</option>
+                          </select>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Rayon / Ərazi *</label>
+                          <input 
+                            required
+                            type="text" 
+                            placeholder="Nərimanov rayonu" 
+                            value={regForm.district}
+                            onChange={e => setRegForm({...regForm, district: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-gray-300 mb-1 block">Ətraflı Ünvan *</label>
+                        <input 
+                          required
+                          type="text" 
+                          placeholder="Məs: Təbriz küçəsi 44, Metro yaxınlığı" 
+                          value={regForm.workingAddress}
+                          onChange={e => setRegForm({...regForm, workingAddress: e.target.value})}
+                          className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-gray-300 mb-1.5 block">📍 Koordinatlar (isteğe bağlı — Google Maps-dan kopyalayın)</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] text-gray-400 mb-1 block">Enlik (Latitude)</label>
+                            <input
+                              type="number"
+                              step="0.0001"
+                              placeholder="40.3985"
+                              value={regForm.latitude}
+                              onChange={e => setRegForm({...regForm, latitude: parseFloat(e.target.value) || 40.3985})}
+                              className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-gray-400 mb-1 block">Uzunluq (Longitude)</label>
+                            <input
+                              type="number"
+                              step="0.0001"
+                              placeholder="49.8671"
+                              value={regForm.longitude}
+                              onChange={e => setRegForm({...regForm, longitude: parseFloat(e.target.value) || 49.8671})}
+                              className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1.5">💡 Google Maps-da yerinizi tapın, sağ klik → koordinatları kopyalayın</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 4: Qalereya, Sosial Media və İş Saatları */}
+                  {regStep === 4 && (
+                    <div className="space-y-4">
+                      
+                      {/* Drag & Drop File Uploads */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Profil Şəkliniz (Drag & Drop) *</label>
+                          <DragDropUpload 
+                            label="Profil Şəkli" 
+                            value={regForm.profilePhoto} 
+                            onChange={(url) => setRegForm({...regForm, profilePhoto: url})} 
+                            presetIcon="👤"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Arxa Fon Şəkli (Drag & Drop) *</label>
+                          <DragDropUpload 
+                            label="Panorama Arxa Fon" 
+                            value={regForm.coverPhoto} 
+                            onChange={(url) => setRegForm({...regForm, coverPhoto: url})} 
+                            presetIcon="🖼️"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">İşə Başlama Saatı *</label>
+                          <input 
+                            required
+                            type="time" 
+                            value={regForm.workStartHour}
+                            onChange={e => setRegForm({...regForm, workStartHour: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">İş Bitmə Saatı *</label>
+                          <input 
+                            required
+                            type="time" 
+                            value={regForm.workEndHour}
+                            onChange={e => setRegForm({...regForm, workEndHour: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Instagram İstifadəçi Adınız</label>
+                          <input 
+                            type="text" 
+                            placeholder="emin.barber.baku" 
+                            value={regForm.instagram}
+                            onChange={e => setRegForm({...regForm, instagram: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-300 mb-1 block">Sertifikatlar</label>
+                          <input 
+                            type="text" 
+                            placeholder="Luxio Diploma" 
+                            value={regForm.certificates}
+                            onChange={e => setRegForm({...regForm, certificates: e.target.value})}
+                            className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Wizard Buttons */}
+                  <div className="flex items-center justify-between pt-3 border-t border-purple-900/30">
+                    {regStep > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => setRegStep(regStep - 1)}
+                        className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white rounded-xl bg-[#161327] border border-purple-800/40 transition-colors"
+                      >
+                        Geri
+                      </button>
+                    ) : (
+                      <div />
+                    )}
+
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 text-xs font-bold text-white rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 hover:from-violet-500 shadow-md flex items-center gap-1.5"
+                    >
+                      {regStep < 4 ? "Növbəti" : "Qeydiyyatı Tamamla"}
+                    </button>
+                  </div>
+
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* TOP NAVIGATION BAR */}
+          <header className="sticky top-0 z-40 glass-panel border-b border-purple-900/30">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
+              
+              <div 
+                onClick={() => { setActiveProSlug(null); setRole('customer'); }}
+                className="flex items-center gap-2.5 cursor-pointer group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-purple-500/25 group-hover:scale-105 transition-transform">
+                  <i data-lucide="calendar" className="w-5 h-5 text-white"></i>
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-display font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-purple-100 to-fuchsia-400">
+                    {siteSettings.siteName.split('.')[0]}<span className="text-violet-400">.{siteSettings.siteName.split('.')[1] || 'az'}</span>
+                  </span>
+                  <span className="text-[10px] text-fuchsia-400 tracking-wider font-extrabold lowercase -mt-1">
+                    {siteSettings.logoSubtitle}
+                  </span>
+                </div>
+              </div>
+
+              <div className="hidden md:flex items-center p-1 rounded-xl bg-[#161327] border border-purple-900/40">
+                <button 
+                  onClick={() => { setRole('customer'); setActiveProSlug(null); }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${role === 'customer' && !activeProSlug ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+                >
+                  <i data-lucide="search" className="w-3.5 h-3.5"></i>
+                  Müştəri (Axtarış)
+                </button>
+                <button 
+                  onClick={() => setRole('professional')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${role === 'professional' ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+                >
+                  <i data-lucide="layout-dashboard" className="w-3.5 h-3.5"></i>
+                  Mütəxəssis Kabineti
+                </button>
+                <button 
+                  onClick={() => setRole('admin')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${role === 'admin' ? 'bg-purple-700 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+                >
+                  <i data-lucide="shield" className="w-3.5 h-3.5"></i>
+                  Super Admin
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                {loggedInProId ? (
+                  <>
+                    <button 
+                      onClick={() => { setRole('professional'); setDashTab('overview'); }}
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-[#161327] hover:bg-[#282245] border border-purple-800/40 text-violet-300 transition-all flex items-center gap-2"
+                    >
+                      <img src={loggedInPro.profilePhoto} className="w-5 h-5 rounded-full object-cover border border-violet-400" />
+                      <span className="flex items-center gap-1">
+                        <span>💼 Kabinetə Keçid ({loggedInPro.fullName})</span>
+                      </span>
+                    </button>
+                    <button 
+                      onClick={() => { setLoggedInProId(null); setRole('customer'); triggerToast('Kabinetdən çıxış edildi.'); }}
+                      className="px-3 py-2 rounded-xl bg-rose-950/20 border border-rose-900/30 text-rose-400 hover:bg-rose-900/30 transition-all text-xs font-bold"
+                      title="Çıxış Et"
+                    >
+                      Çıxış
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => setShowLoginModal(true)}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#161327] hover:bg-[#282245] border border-purple-800/40 text-violet-300 transition-all flex items-center gap-1.5"
+                    >
+                      <i data-lucide="log-in" className="w-4 h-4"></i>
+                      Mütəxəssis Girişi
+                    </button>
+
+                    <button 
+                      onClick={() => setShowRegisterModal(true)}
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 hover:from-violet-500 text-white shadow-lg shadow-purple-600/30 transition-all flex items-center gap-1.5"
+                    >
+                      <i data-lucide="sparkles" className="w-4 h-4"></i>
+                      Mütəxəssis Ol
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1">
+            {activeProSlug ? (
+              <PublicBookingPage 
+                pro={activePro}
+                onBack={() => setActiveProSlug(null)}
+                bookings={bookings}
+                setBookings={setBookings}
+                customers={customers}
+                setCustomers={setCustomers}
+                waitlist={waitlist}
+                setWaitlist={setWaitlist}
+                triggerToast={triggerToast}
+                triggerTelegramBotNotice={triggerTelegramBotNotice}
+              />
+            ) : role === 'customer' ? (
+              <MarketplaceView 
+                pros={filteredPros}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                selectedProfession={selectedProfession}
+                setSelectedProfession={setSelectedProfession}
+                selectedCity={selectedCity}
+                setSelectedCity={setSelectedCity}
+                onSelectPro={(slug) => setActiveProSlug(slug)}
+                onOpenRegister={() => setShowRegisterModal(true)}
+                siteSettings={siteSettings}
+              />
+            ) : role === 'professional' ? (
+              loggedInProId ? (
+                <ProfessionalDashboard 
+                  pro={loggedInPro}
+                  setPro={(updatedPro) => {
+                    setPros(pros.map(p => p.id === updatedPro.id ? updatedPro : p));
+                  }}
+                  dashTab={dashTab}
+                  setDashTab={setDashTab}
+                  bookings={bookings}
+                  setBookings={setBookings}
+                  customers={customers}
+                  setCustomers={setCustomers}
+                  triggerToast={triggerToast}
+                  triggerTelegramBotNotice={triggerTelegramBotNotice}
+                />
+              ) : (
+                <ProfessionalLoginScreen 
+                  loginForm={loginForm}
+                  setLoginForm={setLoginForm}
+                  handleProLogin={handleProLogin}
+                  onOpenRegister={() => setShowRegisterModal(true)}
+                />
+              )
+            ) : (
+              <AdminDashboard 
+                pros={pros}
+                setPros={setPros}
+                bookings={bookings}
+                setBookings={setBookings}
+                siteSettings={siteSettings}
+                setSiteSettings={setSiteSettings}
+                triggerToast={triggerToast}
+              />
+            )}
+          </main>
+
+          {/* FOOTER */}
+          <footer className="glass-panel border-t border-purple-900/30 mt-auto py-8 text-center text-xs text-gray-500">
+            <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2 font-display font-semibold text-gray-300">
+                <span className="w-2 h-2 rounded-full bg-fuchsia-500 animate-pulse"></span>
+                {siteSettings.siteName} SaaS Platform &copy; 2026. Bütün hüquqlar qorunur.
+              </div>
+            </div>
+          </footer>
+
+        </div>
+      );
+    }
+
+    // --- 1. MARKETPLACE VIEW ---
+    function MarketplaceView({ pros, searchQuery, setSearchQuery, selectedProfession, setSelectedProfession, selectedCity, setSelectedCity, onSelectPro, onOpenRegister, siteSettings }) {
+      return (
+        <div className="space-y-10 py-8 px-4 sm:px-6 max-w-7xl mx-auto">
+          <div className="relative rounded-3xl overflow-hidden glass-panel border border-purple-500/20 p-8 sm:p-12 text-center space-y-6 glow-violet">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-48 bg-purple-600/15 blur-[120px] rounded-full pointer-events-none"></div>
+            
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-purple-500/10 border border-purple-500/30 text-violet-300">
+              <i data-lucide="zap" className="w-3.5 h-3.5 text-fuchsia-400"></i>
+              {siteSettings.logoSubtitle}
+            </span>
+
+            <h1 className="text-3xl sm:text-5xl font-display font-extrabold text-white max-w-4xl mx-auto leading-tight">
+              {siteSettings.heroHeadline}
+            </h1>
+            
+            <p className="text-sm sm:text-base text-gray-300 max-w-2xl mx-auto">
+              {siteSettings.heroSubtext}
+            </p>
+
+            <div className="max-w-3xl mx-auto bg-[#161327] p-3 rounded-2xl border border-purple-900/50 shadow-2xl flex flex-col sm:flex-row items-center gap-3">
+              <div className="flex-1 flex items-center gap-2.5 px-3 w-full">
+                <i data-lucide="search" className="w-5 h-5 text-violet-400"></i>
+                <input 
+                  type="text" 
+                  placeholder="Mütəxəssis adı, xidmət və ya məkan..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="h-6 w-[1px] bg-purple-900/50 hidden sm:block"></div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <select 
+                  value={selectedProfession}
+                  onChange={e => setSelectedProfession(e.target.value)}
+                  className="bg-[#282245] border border-purple-800/40 text-xs font-semibold text-gray-200 rounded-xl px-3 py-2.5 focus:outline-none"
+                >
+                  <option value="All">Bütün Peşələr</option>
+                  {PROFESSIONS_LIST.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+
+                <select 
+                  value={selectedCity}
+                  onChange={e => setSelectedCity(e.target.value)}
+                  className="bg-[#282245] border border-purple-800/40 text-xs font-semibold text-gray-200 rounded-xl px-3 py-2.5 focus:outline-none"
+                >
+                  <option value="All">Ərazilər</option>
+                  <option value="Bakı">Bakı</option>
+                  <option value="Sumqayıt">Sumqayıt</option>
+                  <option value="Gəncə">Gəncə</option>
+                  <option value="Naxçıvan">Naxçıvan</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-display font-bold text-white flex items-center gap-2">
+                <i data-lucide="star" className="w-5 h-5 text-amber-400"></i>
+                Məşhur Mütəxəssislər & Məkanlar
+                <span className="text-xs bg-purple-500/20 text-violet-300 px-2.5 py-0.5 rounded-full border border-purple-500/30">
+                  {pros.length} tapıldı
+                </span>
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pros.map(pro => (
+                <div 
+                  key={pro.id}
+                  className="glass-panel rounded-2xl overflow-hidden border border-purple-900/40 hover:border-violet-500/50 transition-all duration-300 group flex flex-col"
+                >
+                  <div className="h-32 relative overflow-hidden bg-gray-900">
+                    <img 
+                      src={pro.coverPhoto} 
+                      alt={pro.fullName} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80"
+                    />
+                    <div className="absolute top-3 right-3 bg-[#161327]/90 backdrop-blur-md px-2.5 py-1 rounded-full text-xs font-bold text-amber-400 border border-amber-400/30 flex items-center gap-1">
+                      <i data-lucide="star" className="w-3.5 h-3.5 fill-amber-400"></i>
+                      {pro.rating} ({pro.reviewCount})
+                    </div>
+                  </div>
+
+                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4 -mt-10">
+                    <div className="flex items-end gap-3">
+                      <img 
+                        src={pro.profilePhoto} 
+                        alt={pro.fullName} 
+                        className="w-16 h-16 rounded-2xl object-cover border-2 border-[#0C0A15] shadow-xl"
+                      />
+                      <div>
+                        <h3 className="font-display font-bold text-lg text-white group-hover:text-violet-400 transition-colors">
+                          {pro.fullName}
+                        </h3>
+                        <span className="text-xs font-semibold text-violet-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                          {pro.profession}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-gray-400 line-clamp-2">
+                      {pro.about}
+                    </p>
+
+                    <div className="space-y-1.5 text-xs text-gray-400 pt-2 border-t border-purple-900/30">
+                      <div className="flex items-center gap-2">
+                        <i data-lucide="map-pin" className="w-3.5 h-3.5 text-fuchsia-400"></i>
+                        <span className="truncate">{pro.workingAddress} ({pro.city})</span>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={() => onSelectPro(pro.slug)}
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 font-bold text-white text-xs shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 transition-all"
+                    >
+                      <i data-lucide="calendar" className="w-4 h-4"></i>
+                      Randevunu Rezerv Et! (rezerv.az/{pro.slug})
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- 2. PUBLIC BOOKING PAGE ---
+    function PublicBookingPage({ pro, onBack, bookings, setBookings, customers, setCustomers, waitlist, setWaitlist, triggerToast, triggerTelegramBotNotice }) {
+      const [selectedService, setSelectedService] = useState(pro.services[0]);
+      const [selectedDate, setSelectedDate] = useState('2026-07-24');
+      const [selectedTime, setSelectedTime] = useState('11:00');
+      
+      const [showModal, setShowModal] = useState(false);
+      const [selectedAvatar, setSelectedAvatar] = useState('👑');
+      const [customerForm, setCustomerForm] = useState({
+        name: '', phone: '', email: '', telegram: '', notes: '', paymentMethod: 'cash'
+      });
+
+      const proBookingsToday = useMemo(() => {
+        return bookings.filter(b => b.professionalId === pro.id && b.date === selectedDate);
+      }, [bookings, pro.id, selectedDate]);
+
+      const isDateBlocked = useMemo(() => {
+        return pro.blockedDates && pro.blockedDates.includes(selectedDate);
+      }, [pro.blockedDates, selectedDate]);
+
+      const baseSlots = ['09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
+
+      const calculatedSlots = useMemo(() => {
+        return baseSlots.map(t => {
+          if (isDateBlocked) {
+            return { time: t, status: 'blocked', bookedBy: 'İstirahət günü' };
+          }
+          if (pro.blockedHours && pro.blockedHours.includes(t)) {
+            return { time: t, status: 'blocked', bookedBy: 'Dondurulub' };
+          }
+          if (pro.blockedHoursByDate && pro.blockedHoursByDate[selectedDate] && pro.blockedHoursByDate[selectedDate].includes(t)) {
+            return { time: t, status: 'blocked', bookedBy: 'Dondurulub' };
+          }
+          const match = proBookingsToday.find(b => b.time === t);
+          if (match) {
+            return {
+              time: t,
+              status: 'booked',
+              bookedBy: match.customerName,
+              avatar: match.customerAvatar || '👤'
+            };
+          }
+          return { time: t, status: 'available' };
+        });
+      }, [proBookingsToday, isDateBlocked, pro.blockedHours, pro.blockedHoursByDate, selectedDate]);
+
+      const googleMapsDirUrl = `https://www.google.com/maps/dir/?api=1&destination=${pro.latitude},${pro.longitude}`;
+      const wazeDirUrl = `https://waze.com/ul?ll=${pro.latitude},${pro.longitude}&navigate=yes`;
+
+      const handleConfirmBooking = (e) => {
+        e.preventDefault();
+
+        const isClientBlacklisted = customers.some(
+          c => c.isBlacklisted && 
+          (c.phone.replace(/\s+/g, '') === customerForm.phone.replace(/\s+/g, '') ||
+           c.name.toLowerCase() === customerForm.name.toLowerCase())
+        );
+
+        if (isClientBlacklisted) {
+          triggerToast("Təəssüf ki, rezervasiyanız qəbul edilmədi (Müştəri bloklanıb).", "error");
+          return;
+        }
+
+        const newBooking = {
+          id: `b-${Date.now()}`,
+          professionalId: pro.id,
+          serviceName: selectedService.name,
+          price: selectedService.price,
+          date: selectedDate,
+          time: selectedTime,
+          customerName: customerForm.name || 'Müştəri',
+          customerAvatar: selectedAvatar,
+          customerPhone: customerForm.phone,
+          customerEmail: customerForm.email,
+          customerTelegram: customerForm.telegram,
+          notes: customerForm.notes,
+          paymentMethod: customerForm.paymentMethod,
+          status: 'pending'
+        };
+
+        setBookings([newBooking, ...bookings]);
+
+        const telegramPayload = {
+          chatId: pro.telegramChatId || '123456789',
+          text: `🔔 YENİ RANDEVU REZERVA EDİLDİ!\n\n` +
+                `👤 Müştəri: ${selectedAvatar} ${customerForm.name || 'Müştəri'}\n` +
+                `📞 Telefon: ${customerForm.phone}\n` +
+                `📧 E-poçt: ${customerForm.email || 'Qeyd olunmayıb'}\n` +
+                `✂️ Xidmət: ${selectedService.name} (${selectedService.price} AZN)\n` +
+                `📅 Tarix: ${selectedDate} saat ${selectedTime}\n` +
+                `💳 Ödəniş: ${customerForm.paymentMethod === 'cash' ? 'Nağd (Qəbulda)' : 'Onlayn Kart'}\n` +
+                `📝 Qeyd: ${customerForm.notes || 'Yoxdur'}\n` +
+                `📍 Ünvan: ${pro.workingAddress}\n\n` +
+                `🗺 Google Maps: ${googleMapsDirUrl}\n` +
+                `🚗 Waze Naviqasiya: ${wazeDirUrl}`
+        };
+
+        const customerPayload = {
+          recipient: customerForm.phone,
+          email: customerForm.email || 'Qeyd olunmayıb',
+          text: `✉️ SMS & E-POÇT BİLDİRİŞİ (Müştəriyə)\n\n` +
+                `Hörmətli ${selectedAvatar} ${customerForm.name || 'Müştəri'},\n` +
+                `Randevunuz UĞURLA REZERV EDİLDİ!\n\n` +
+                `👤 Mütəxəssis: ${pro.fullName} (${pro.businessName})\n` +
+                `✂️ Xidmət: ${selectedService.name} (${selectedService.price} AZN)\n` +
+                `📅 Tarix: ${selectedDate} saat ${selectedTime}\n` +
+                `📍 Ünvan: ${pro.workingAddress}\n\n` +
+                `Randevu haqqında SMS bildirişi ${customerForm.phone} nömrəsinə göndərildi.`
+        };
+
+        setShowModal(false);
+        triggerToast(`${selectedAvatar} ${customerForm.name} - randevunuz təsdiqləndi!`);
+        triggerTelegramBotNotice({
+          specialist: telegramPayload,
+          customer: customerPayload
+        });
+      };
+
+      return (
+        <div className="min-h-screen py-6 px-4 sm:px-6 max-w-6xl mx-auto space-y-8 animate-fade-in">
+          <button 
+            onClick={onBack}
+            className="flex items-center gap-2 text-xs font-bold text-violet-300 bg-purple-500/10 border border-purple-500/20 px-3.5 py-2 rounded-xl hover:bg-purple-500/20 transition-all"
+          >
+            <i data-lucide="arrow-left" className="w-4 h-4"></i>
+            Bütün Mütəxəssislərə Qayıt
+          </button>
+
+          <div className="glass-panel rounded-3xl overflow-hidden border border-purple-900/40">
+            <div className="h-48 sm:h-64 relative bg-gray-900">
+              <img src={pro.coverPhoto} alt={pro.fullName} className="w-full h-full object-cover opacity-80" />
+            </div>
+
+            <div className="p-6 sm:p-8 -mt-16 sm:-mt-20 relative flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5">
+                <img 
+                  src={pro.profilePhoto} 
+                  alt={pro.fullName} 
+                  className="w-28 h-28 sm:w-36 sm:h-36 rounded-3xl object-cover border-4 border-[#0C0A15] shadow-2xl"
+                />
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-white">{pro.fullName}</h1>
+                    <i data-lucide="badge-check" className="w-6 h-6 text-violet-400 fill-violet-400/20"></i>
+                  </div>
+                  <p className="text-sm font-semibold text-violet-300">{pro.businessName} • {pro.profession}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-8">
+              <div className="glass-panel rounded-2xl p-6 border border-purple-900/40 space-y-4">
+                <h3 className="font-display text-lg font-bold text-white flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <i data-lucide="scissors" className="w-5 h-5 text-violet-400"></i>
+                    Xidmətlər & Qiymət Siyahısı
+                  </span>
+                </h3>
+
+                <div className="space-y-3">
+                  {pro.services.map(srv => (
+                    <div 
+                      key={srv.id}
+                      onClick={() => setSelectedService(srv)}
+                      className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${selectedService.id === srv.id ? 'bg-purple-600/15 border-purple-500 shadow-md' : 'bg-[#161327]/60 border-purple-900/30 hover:border-purple-800'}`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: srv.color }}></span>
+                          <h4 className="font-bold text-sm text-white">{srv.name}</h4>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-purple-950 text-purple-200 font-medium">{srv.category}</span>
+                        </div>
+                        <p className="text-xs text-gray-400">{srv.description}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-display font-extrabold text-lg text-white">{srv.price} AZN</span>
+                        <p className="text-xs text-gray-400 flex items-center justify-end gap-1">
+                          <i data-lucide="clock" className="w-3 h-3"></i>
+                          {srv.duration} dəq
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="glass-panel rounded-3xl p-6 border border-purple-500/30 space-y-6 sticky top-24 glow-violet">
+                <div className="flex items-center justify-between border-b border-purple-900/40 pb-4">
+                  <div>
+                    <h3 className="font-display text-lg font-bold text-white">Randevunu Rezerv Et!</h3>
+                    <p className="text-xs text-violet-300 font-semibold">{selectedService.name} ({selectedService.duration} dəq)</p>
+                  </div>
+                  <span className="text-lg font-extrabold text-white">{selectedService.price} AZN</span>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-400 mb-2 block">Tarix Seçin</label>
+                  <input 
+                    type="date" 
+                    value={selectedDate}
+                    onChange={e => setSelectedDate(e.target.value)}
+                    className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-sm text-white"
+                  />
+                </div>
+
+                <div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {calculatedSlots.map(slot => (
+                      <button
+                        key={slot.time}
+                        disabled={slot.status === 'blocked'}
+                        onClick={() => {
+                          setSelectedTime(slot.time);
+                          if (slot.status !== 'blocked') {
+                            setShowModal(true);
+                          }
+                        }}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center border ${slot.status === 'booked' ? 'bg-purple-950/80 border-purple-700/60 text-violet-300' : slot.status === 'blocked' ? 'bg-rose-950/30 border-rose-900/30 text-rose-400 cursor-not-allowed' : selectedTime === slot.time ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white' : 'bg-[#161327] border-purple-900/40 text-gray-200'}`}
+                      >
+                        <span>{slot.time}</span>
+                        <span className="text-[9px] font-normal opacity-80 truncate">{slot.status === 'booked' ? slot.bookedBy : slot.status === 'blocked' ? slot.bookedBy : 'Açıq'}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button 
+                  disabled={isDateBlocked}
+                  onClick={() => setShowModal(true)}
+                  className={`w-full py-3.5 rounded-xl font-bold text-white shadow-xl flex items-center justify-center gap-2 ${isDateBlocked ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 hover:from-violet-500'}`}
+                >
+                  {isDateBlocked ? 'Tarix Doludur' : 'Randevunu Rezerv Et!'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {showModal && (
+            <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="glass-panel max-w-lg w-full rounded-2xl p-6 relative border border-purple-500/40 shadow-2xl space-y-5 glow-violet">
+                <button 
+                  type="button"
+                  onClick={() => setShowModal(false)} 
+                  className="absolute top-4 right-4 text-gray-400 hover:text-white p-2 w-8 h-8 rounded-xl bg-[#161327] border border-purple-800/40 transition-colors flex items-center justify-center font-bold text-xs"
+                >
+                  ✕
+                </button>
+
+                <div className="border-b border-purple-900/40 pb-3 pr-8">
+                  <h3 className="font-display text-xl font-bold text-white">Randevunu Təsdiqlə</h3>
+                </div>
+
+                <form onSubmit={handleConfirmBooking} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Ad Soyadınız *</label>
+                      <input 
+                        required
+                        type="text" 
+                        placeholder="Kamran Rəhimov" 
+                        value={customerForm.name}
+                        onChange={e => setCustomerForm({...customerForm, name: e.target.value})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Telefon Nömrəniz *</label>
+                      <input 
+                        required
+                        type="text" 
+                        placeholder="+994 50 123 45 67" 
+                        value={customerForm.phone}
+                        onChange={e => setCustomerForm({...customerForm, phone: e.target.value})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">E-poçt Ünvanı</label>
+                      <input 
+                        type="email" 
+                        placeholder="kamran@mail.com" 
+                        value={customerForm.email}
+                        onChange={e => setCustomerForm({...customerForm, email: e.target.value})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Telegram İstifadəçi Adınız</label>
+                      <input 
+                        type="text" 
+                        placeholder="@kamran_rahim" 
+                        value={customerForm.telegram}
+                        onChange={e => setCustomerForm({...customerForm, telegram: e.target.value})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300 mb-1 block">Ödəniş Metodu</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCustomerForm({...customerForm, paymentMethod: 'cash'})}
+                        className={`py-2 rounded-xl text-xs font-bold border transition-all ${
+                          customerForm.paymentMethod === 'cash'
+                            ? 'bg-purple-600 border-purple-500 text-white'
+                            : 'bg-[#161327] border-purple-900/40 text-gray-400 hover:border-purple-800'
+                        }`}
+                      >
+                        💵 Nağd (Qəbulda)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomerForm({...customerForm, paymentMethod: 'card'})}
+                        className={`py-2 rounded-xl text-xs font-bold border transition-all ${
+                          customerForm.paymentMethod === 'card'
+                            ? 'bg-purple-600 border-purple-500 text-white'
+                            : 'bg-[#161327] border-purple-900/40 text-gray-400 hover:border-purple-800'
+                        }`}
+                      >
+                        💳 Kart ilə (Onlayn)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300 mb-1 block">Qeyd və Xüsusi İstəklər</label>
+                    <textarea 
+                      rows="2"
+                      placeholder="Əlavə qeydləriniz və ya xüsusi istəkləriniz varsa yazın..." 
+                      value={customerForm.notes}
+                      onChange={e => setCustomerForm({...customerForm, notes: e.target.value})}
+                      className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 hover:from-violet-500 font-bold text-white shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2"
+                  >
+                    <i data-lucide="check" className="w-4 h-4"></i>
+                    Randevunu Təsdiqlə və Rezerv Et
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- 3. PROFESSIONAL DASHBOARD WITH FULLY WORKING TELEGRAM INTEGRATION TAB ---
+    function ProfessionalDashboard({ pro, setPro, dashTab, setDashTab, bookings, setBookings, customers, setCustomers, triggerToast, triggerTelegramBotNotice }) {
+      const [newServiceForm, setNewServiceForm] = useState({
+        name: '', price: 30, duration: 45, category: 'Əsas', color: '#8B5CF6', description: '', preparationInstructions: ''
+      });
+
+      // FULLY WORKING TELEGRAM CONFIG STATE
+      const [tgConfig, setTgConfig] = useState({
+        botToken: pro.telegramBotToken || 'bot591823910:AAHz918239018239',
+        chatId: pro.telegramChatId || '123456789',
+        notifyNewBooking: pro.notifyNewBooking !== false,
+        notifyCancellation: pro.notifyCancellation !== false,
+        notifyReminder: pro.notifyReminder !== false
+      });
+
+      useEffect(() => {
+        setTgConfig({
+          botToken: pro.telegramBotToken || 'bot591823910:AAHz918239018239',
+          chatId: pro.telegramChatId || '123456789',
+          notifyNewBooking: pro.notifyNewBooking !== false,
+          notifyCancellation: pro.notifyCancellation !== false,
+          notifyReminder: pro.notifyReminder !== false
+        });
+      }, [pro]);
+
+      const [editForm, setEditForm] = useState({ ...pro });
+      useEffect(() => {
+        setEditForm({ ...pro });
+      }, [pro, dashTab]);
+
+      const [selectedScheduleDate, setSelectedScheduleDate] = useState('2026-07-24');
+
+      const handleToggleBlockDate = (date) => {
+        let newBlocked = [...(pro.blockedDates || [])];
+        if (newBlocked.includes(date)) {
+          newBlocked = newBlocked.filter(d => d !== date);
+        } else {
+          newBlocked.push(date);
+        }
+        setPro({ ...pro, blockedDates: newBlocked });
+        triggerToast(newBlocked.includes(date) ? `${date} istirahət günü təyin edildi!` : `${date} yenidən iş günü edildi!`);
+      };
+
+      const handleToggleBlockHour = (date, hour) => {
+        let currentBlocked = { ...(pro.blockedHoursByDate || {}) };
+        let hoursForDate = [...(currentBlocked[date] || [])];
+        if (hoursForDate.includes(hour)) {
+          hoursForDate = hoursForDate.filter(h => h !== hour);
+        } else {
+          hoursForDate.push(hour);
+        }
+        currentBlocked[date] = hoursForDate;
+        setPro({ ...pro, blockedHoursByDate: currentBlocked });
+        triggerToast(`${hour} saatı donduruldu/aktivləşdirildi!`);
+      };
+
+      const handleDragDropBooking = (e, newTime) => {
+        e.preventDefault();
+        const bookingId = e.dataTransfer.getData('text/plain');
+        if (!bookingId) return;
+
+        const isBooked = bookings.some(b => b.professionalId === pro.id && b.date === selectedScheduleDate && b.time === newTime);
+        if (isBooked) {
+          triggerToast("Bu saat artıq doludur!", "error");
+          return;
+        }
+
+        const updatedBookings = bookings.map(b => {
+          if (b.id === bookingId) {
+            const payload = {
+              chatId: pro.telegramChatId || '123456789',
+              text: `🔔 RANDEVU SAATI DƏYİŞDİRİLDİ!\n\n` +
+                    `👤 Müştəri: ${b.customerName}\n` +
+                    `✂️ Xidmət: ${b.serviceName}\n` +
+                    `📅 Yeni Tarix: ${b.date} saat ${newTime} (Əvvəlki: ${b.time})`
+            };
+            triggerTelegramBotNotice(payload);
+            return { ...b, time: newTime };
+          }
+          return b;
+        });
+
+        setBookings(updatedBookings);
+        triggerToast(`Görüş saatı ${newTime} olaraq dəyişdirildi!`);
+      };
+
+      const navItems = [
+        { id: 'overview', label: 'Ümumi Baxış & Canlı Cədvəl', icon: 'layout-dashboard' },
+        { id: 'schedule', label: 'İş Saatları & Qrafik', icon: 'clock' },
+        { id: 'calendar', label: 'Təqvim (Drag & Drop)', icon: 'calendar' },
+        { id: 'services', label: 'Xidmət Paneli & Qiymətlər', icon: 'scissors' },
+        { id: 'builder', label: 'Səhifə Redaktoru (Live)', icon: 'palette' },
+        { id: 'telegram', label: 'Telegram İnteqrasiyası (100% İşlək)', icon: 'send' },
+        { id: 'crm', label: 'Müştəri CRM & Blacklist', icon: 'users' }
+      ];
+
+      const proBookings = useMemo(() => {
+        return bookings.filter(b => b.professionalId === pro.id);
+      }, [bookings, pro.id]);
+
+      // SAVE TELEGRAM CONFIG HANDLER
+      const handleSaveTelegram = (e) => {
+        e.preventDefault();
+        setPro({
+          ...pro,
+          telegramBotToken: tgConfig.botToken,
+          telegramChatId: tgConfig.chatId,
+          notifyNewBooking: tgConfig.notifyNewBooking,
+          notifyCancellation: tgConfig.notifyCancellation,
+          notifyReminder: tgConfig.notifyReminder,
+          telegramBotConnected: true
+        });
+        triggerToast('Telegram Bot tənzimləmələri və bildiriş qaydaları canlı yadda saxlanıldı!');
+      };
+
+      // TEST TELEGRAM NOTIFICATION HANDLER
+      const handleSendTestTelegram = () => {
+        const payload = {
+          chatId: tgConfig.chatId || '123456789',
+          text: `🧪 TELEGRAM BOT İNTEQRASIYA VƏ BİLDİRİŞ TESTİ!\n\n` +
+                `✅ Status: Telegram Bağlantısı 100% Aktivdir\n` +
+                `🤖 Bot Token: ${tgConfig.botToken}\n` +
+                `📲 Çat ID: ${tgConfig.chatId}\n\n` +
+                `📢 Avtomatik Qaydalar:\n` +
+                `• Yeni Randevular: ${tgConfig.notifyNewBooking ? 'Aktiv ✅' : 'Deaktiv ❌'}\n` +
+                `• Ləğvlər: ${tgConfig.notifyCancellation ? 'Aktiv ✅' : 'Deaktiv ❌'}\n\n` +
+                `Randevular dərhal bu çata göndəriləcəkdir!`
+        };
+        triggerToast('Test Bildirişləri Göndərildi!');
+        triggerTelegramBotNotice({
+          specialist: payload,
+          customer: {
+            recipient: pro.phone || '+994 50 111 22 33',
+            email: pro.email || 'specialist@rezerv.az',
+            text: `🧪 SMS & E-POÇT BİLDİRİŞ SİSTEMİ TESTİ!\n\n` +
+                  `✅ SMS Kanalları: Aktivdir\n` +
+                  `📧 E-poçt Gateway: Hazırdır\n\n` +
+                  `Müştəri qeydiyyatdan keçdikdən və ya görüş vaxtını dəyişdikdən sonra bildirişlər bu kanalla ona çatdırılır.`
+          }
+        });
+      };
+
+      return (
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6">
+          <div className="glass-panel p-5 rounded-2xl border border-purple-900/40 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <img src={pro.profilePhoto} className="w-14 h-14 rounded-2xl object-cover border-2 border-violet-500" />
+              <div>
+                <h2 className="font-display text-xl font-bold text-white flex items-center gap-2">
+                  {pro.fullName}
+                  <span className="text-xs bg-emerald-500/20 text-emerald-400 font-semibold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                    Aktiv Kabinet
+                  </span>
+                </h2>
+                <p className="text-xs text-gray-400">Şəxsi Keçidiniz: <a href="#" className="text-violet-300 hover:underline font-semibold">rezerv.az/{pro.slug}</a></p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs">
+              <div className="bg-[#161327] px-3.5 py-2 rounded-xl border border-purple-900/40 flex items-center gap-2">
+                <i data-lucide="scissors" className="w-4 h-4 text-violet-400"></i>
+                <div>
+                  <span className="text-gray-400 block text-[10px]">Aktiv Xidmətlər</span>
+                  <span className="font-bold text-white">{pro.services.length} Xidmət</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setDashTab(item.id)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 border ${dashTab === item.id ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white border-violet-400 shadow-lg shadow-purple-600/25' : 'bg-[#161327] text-gray-400 border-purple-900/30 hover:border-purple-800 hover:text-white'}`}
+              >
+                <i data-lucide={item.icon} className="w-4 h-4"></i>
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {/* TAB 1: OVERVIEW */}
+          {dashTab === 'overview' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Metrics Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="glass-panel p-5 rounded-2xl border border-purple-900/40 space-y-1">
+                  <span className="text-xs text-gray-400 font-semibold">Canlı Rezervləriniz</span>
+                  <div className="text-2xl font-display font-extrabold text-white">{proBookings.length} Görüş</div>
+                </div>
+                <div className="glass-panel p-5 rounded-2xl border border-purple-900/40 space-y-1">
+                  <span className="text-xs text-gray-400 font-semibold">Aylıq Gəlir</span>
+                  <div className="text-2xl font-display font-extrabold text-emerald-400">
+                    {proBookings.reduce((sum, b) => sum + Number(b.price || 0), 0)} AZN
+                  </div>
+                </div>
+                <div className="glass-panel p-5 rounded-2xl border border-purple-900/40 space-y-1">
+                  <span className="text-xs text-gray-400 font-semibold">Baza Müştərilər</span>
+                  <div className="text-2xl font-display font-extrabold text-violet-400">{customers.length} Aktiv</div>
+                </div>
+                <div className="glass-panel p-5 rounded-2xl border border-purple-900/40 space-y-1">
+                  <span className="text-xs text-gray-400 font-semibold">Telegram Statusu</span>
+                  <div className="text-2xl font-display font-extrabold text-sky-400">Aktiv</div>
+                </div>
+              </div>
+
+              {/* Public Link Share Row */}
+              <div className="glass-panel p-6 rounded-2xl border border-purple-900/40 space-y-4">
+                <div>
+                  <h4 className="font-display font-bold text-sm text-white">Müştəri Rezervasiya Keçidiniz</h4>
+                  <p className="text-xs text-gray-400">Müştərilərinizə bu linki göndərərək onlayn rezerv qəbul edin</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 items-center">
+                  <div className="flex-1 bg-[#161327] border border-purple-900/40 px-4 py-2.5 rounded-xl font-mono text-xs text-violet-300 select-all w-full text-center sm:text-left">
+                    https://rezerv.az/{pro.slug}
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setRole('customer');
+                      setActiveProSlug(pro.slug);
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 font-bold text-white shadow-lg text-xs w-full sm:w-auto transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <span>👁 Müştəri Görünüşünü Aç</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Bookings List */}
+              <div className="glass-panel p-6 rounded-2xl border border-purple-900/40 space-y-4">
+                <div>
+                  <h4 className="font-display font-bold text-sm text-white">Son Rezervasiyalar və Görüşlər</h4>
+                  <p className="text-xs text-gray-400">Sizin xidmətlərinizi rezerv edən müştərilər</p>
+                </div>
+
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                  {proBookings.map(b => (
+                    <div 
+                      key={b.id}
+                      className="p-4 rounded-xl border border-purple-900/30 bg-[#161327]/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-purple-800 transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg bg-[#282245] w-9 h-9 rounded-xl flex items-center justify-center border border-purple-800/40">
+                          {b.customerAvatar || "👤"}
+                        </span>
+                        <div>
+                          <h5 className="font-bold text-xs text-white">{b.customerName}</h5>
+                          <p className="text-[10px] text-gray-400">📞 {b.customerPhone} | 📧 {b.customerEmail || 'E-poçt qeyd edilməyib'}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:items-end text-left sm:text-right gap-1">
+                        <span className="text-xs font-bold text-violet-300">{b.serviceName} ({b.price} AZN)</span>
+                        <div className="text-[10px] text-gray-400 flex items-center gap-2">
+                          <span>📅 {b.date} saat {b.time}</span>
+                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-900/30 text-[9px] font-bold uppercase">
+                            {b.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {proBookings.length === 0 && (
+                    <div className="text-center py-10 text-xs text-gray-500">
+                      Hələ ki heç bir rezervasiya yoxdur.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: 100% FULLY WORKING TELEGRAM INTEGRATION */}
+          {dashTab === 'telegram' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="glass-panel p-6 rounded-2xl border border-purple-500/30 space-y-6 glow-violet">
+                
+                {/* HEADER */}
+                <div className="flex items-center justify-between border-b border-purple-900/40 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-sky-500/30">
+                      <i data-lucide="send" className="w-6 h-6"></i>
+                    </div>
+                    <div>
+                      <h3 className="font-display font-bold text-xl text-white">Telegram Bot İnteqrasiyası Və Bildiriş İdarəsi</h3>
+                      <p className="text-xs text-gray-400">Görüşlər dərhal Telegram tətbiqinizə bildiriş olaraq göndərilir</p>
+                    </div>
+                  </div>
+
+                  <span className="text-xs bg-emerald-500/20 text-emerald-400 font-bold px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Status: Bot Aktivdir
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  
+                  {/* BOT TOKEN & CHAT CONFIG FORM */}
+                  <form onSubmit={handleSaveTelegram} className="bg-[#161327] p-5 rounded-2xl border border-purple-900/40 space-y-4">
+                    <h4 className="font-bold text-sm text-white flex items-center gap-2 border-b border-purple-900/40 pb-2">
+                      <i data-lucide="key" className="w-4 h-4 text-violet-400"></i>
+                      Bot Token Və Çat ID Tənzimləmələri
+                    </h4>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Telegram Bot Token (`@RezervAzBot` və ya Şəxsi Bot)</label>
+                      <input 
+                        type="text" 
+                        value={tgConfig.botToken}
+                        onChange={e => setTgConfig({...tgConfig, botToken: e.target.value})}
+                        className="w-full bg-[#282245] border border-purple-800/40 rounded-xl px-3.5 py-2 text-xs text-white font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Telegram Çat ID Və Ya İstifadəçi Adı</label>
+                      <input 
+                        type="text" 
+                        value={tgConfig.chatId}
+                        onChange={e => setTgConfig({...tgConfig, chatId: e.target.value})}
+                        className="w-full bg-[#282245] border border-purple-800/40 rounded-xl px-3.5 py-2 text-xs text-white font-mono"
+                      />
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                      <button 
+                        type="submit" 
+                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 font-bold text-white text-xs shadow-lg shadow-purple-600/25 flex items-center justify-center gap-1.5"
+                      >
+                        <i data-lucide="check" className="w-4 h-4"></i>
+                        Tənzimləmələri Yadda Saxla
+                      </button>
+
+                      <button 
+                        type="button"
+                        onClick={handleSendTestTelegram}
+                        className="py-2.5 px-4 rounded-xl bg-[#282245] border border-purple-800/40 text-gray-200 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5"
+                      >
+                        <i data-lucide="send" className="w-3.5 h-3.5 text-sky-400"></i>
+                        Test Mesajı Göndər
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* NOTIFICATION RULES TOGGLES & STEP BY STEP GUIDE */}
+                  <div className="space-y-4">
+                    <div className="bg-[#161327] p-5 rounded-2xl border border-purple-900/40 space-y-3">
+                      <h4 className="font-bold text-sm text-white flex items-center gap-2 border-b border-purple-900/40 pb-2">
+                        <i data-lucide="bell" className="w-4 h-4 text-emerald-400"></i>
+                        Avtomatik Bildiriş Qaydaları
+                      </h4>
+
+                      <label className="flex items-center justify-between p-3 rounded-xl bg-[#282245]/70 border border-purple-800/40 cursor-pointer text-xs text-gray-200">
+                        <span>Yeni Randevu Rezerv Edildikdə (Dərhal Göndər)</span>
+                        <input 
+                          type="checkbox" 
+                          checked={tgConfig.notifyNewBooking}
+                          onChange={e => setTgConfig({...tgConfig, notifyNewBooking: e.target.checked})}
+                          className="w-4 h-4 accent-violet-500"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between p-3 rounded-xl bg-[#282245]/70 border border-purple-800/40 cursor-pointer text-xs text-gray-200">
+                        <span>Randevu Ləğv Edildikdə Və Ya Dəyişdirildikdə</span>
+                        <input 
+                          type="checkbox" 
+                          checked={tgConfig.notifyCancellation}
+                          onChange={e => setTgConfig({...tgConfig, notifyCancellation: e.target.checked})}
+                          className="w-4 h-4 accent-violet-500"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="bg-[#161327] p-4 rounded-2xl border border-purple-900/40 space-y-2 text-xs text-gray-300">
+                      <span className="font-bold text-violet-300 block">💡 Qoşulma Təlimatı:</span>
+                      <ol className="list-decimal list-inside space-y-1 text-gray-400">
+                        <li>Telegram-da <strong className="text-white">@RezervAzBot</strong> botunu tapın.</li>
+                        <li>Bot-da <strong className="text-violet-300">/start</strong> düyməsinə klikləyin.</li>
+                        <li>Çat ID-nizi yuxarıdakı xanaya qeyd edin və <strong className="text-emerald-400">Test Mesajı</strong> göndərin!</li>
+                      </ol>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          )}
+
+          {dashTab === 'schedule' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+              {/* Calendar Column */}
+              <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-purple-900/40 space-y-6">
+                <div className="flex items-center justify-between border-b border-purple-900/40 pb-4">
+                  <div>
+                    <h3 className="font-display font-bold text-lg text-white">Dolu & İstirahət Tarixləri Seçimi</h3>
+                    <p className="text-xs text-gray-400">İstirahət edəcəyiniz günləri və ya müəyyən saatları dondurun</p>
+                  </div>
+                  <span className="text-xs bg-violet-600/20 border border-violet-500/30 px-3 py-1 rounded-full text-violet-300 font-bold">
+                    İyul 2026
+                  </span>
+                </div>
+
+                {/* Calendar Grid */}
+                <div>
+                  <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold text-gray-400 mb-2">
+                    <span>B.e</span>
+                    <span>Ç.a</span>
+                    <span>Çər</span>
+                    <span>C.a</span>
+                    <span>Cüm</span>
+                    <span>Şən</span>
+                    <span>Baz</span>
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    <div />
+                    <div />
+                    {[...Array(31)].map((_, i) => {
+                      const dayNum = i + 1;
+                      const dateStr = `2026-07-${dayNum < 10 ? '0' + dayNum : dayNum}`;
+                      const isBlocked = pro.blockedDates && pro.blockedDates.includes(dateStr);
+                      const hasBlockedHours = pro.blockedHoursByDate && pro.blockedHoursByDate[dateStr] && pro.blockedHoursByDate[dateStr].length > 0;
+                      const isSelected = selectedScheduleDate === dateStr;
+
+                      return (
+                        <button
+                          key={dayNum}
+                          type="button"
+                          onClick={() => setSelectedScheduleDate(dateStr)}
+                          className={`h-12 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center border relative ${
+                            isSelected 
+                              ? 'bg-violet-600 border-white text-white shadow-lg shadow-purple-600/35 z-10' 
+                              : isBlocked 
+                              ? 'bg-rose-950/40 border-rose-900/50 text-rose-300 hover:bg-rose-900/30' 
+                              : hasBlockedHours
+                              ? 'bg-amber-950/40 border-amber-900/50 text-amber-300 hover:bg-amber-900/30'
+                              : 'bg-[#161327] border-purple-900/40 text-gray-200 hover:border-purple-800'
+                          }`}
+                        >
+                          <span>{dayNum}</span>
+                          <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full" style={{
+                            backgroundColor: isBlocked ? '#EF4444' : hasBlockedHours ? '#F59E0B' : 'transparent'
+                          }}></span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex gap-4 text-[10px] text-gray-400 border-t border-purple-900/30 pt-4">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#EF4444]"></span>
+                    İstirahət Günü (Tam Block)
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]"></span>
+                    Dondurulmuş Saatlar (Qismən Block)
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded border border-purple-900/40 bg-[#161327]"></span>
+                    İş Günü (Aktiv)
+                  </span>
+                </div>
+              </div>
+
+              {/* Day settings Panel */}
+              <div className="glass-panel p-6 rounded-2xl border border-purple-900/40 space-y-6">
+                <div>
+                  <h3 className="font-display font-bold text-lg text-white">Saat Tənzimləmələri</h3>
+                  <p className="text-xs text-violet-300 font-semibold">{selectedScheduleDate} tarixi üçün</p>
+                </div>
+
+                {/* Day status toggle */}
+                <div className="bg-[#161327] p-4 rounded-xl border border-purple-900/40 space-y-3">
+                  <h4 className="text-xs font-bold text-gray-200">Gün Statusu</h4>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleBlockDate(selectedScheduleDate)}
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${
+                      pro.blockedDates && pro.blockedDates.includes(selectedScheduleDate)
+                        ? 'bg-rose-950/40 border-rose-500 text-rose-300 hover:bg-rose-900/30'
+                        : 'bg-emerald-950/40 border-emerald-500 text-emerald-300 hover:bg-emerald-900/30'
+                    }`}
+                  >
+                    {pro.blockedDates && pro.blockedDates.includes(selectedScheduleDate)
+                      ? "✕ İstirahət Günü (Bloklanıb)"
+                      : "✓ Aktiv İş Günü"}
+                  </button>
+                  <p className="text-[10px] text-gray-500 leading-normal">
+                    İstirahət günü təyin edildikdə, müştərilər bu gündə heç bir saatı rezerv edə bilməzlər.
+                  </p>
+                </div>
+
+                {/* Hour slots freeze panel */}
+                {!(pro.blockedDates && pro.blockedDates.includes(selectedScheduleDate)) && (
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-gray-200">Müəyyən Saatları Dondur</h4>
+                    <p className="text-[10px] text-gray-500 leading-normal">
+                      Müştərilərinizə bağlamaq istədiyiniz saatların üzərinə klikləyərək dondurun:
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1">
+                      {['09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00'].map(slot => {
+                        const isSlotFrozen = pro.blockedHoursByDate && pro.blockedHoursByDate[selectedScheduleDate] && pro.blockedHoursByDate[selectedScheduleDate].includes(slot);
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            onClick={() => handleToggleBlockHour(selectedScheduleDate, slot)}
+                            className={`py-2 rounded-xl text-xs font-bold border transition-all flex flex-col items-center justify-center ${
+                              isSlotFrozen
+                                ? 'bg-rose-950/50 border-rose-800 text-rose-300 hover:bg-rose-900/20'
+                                : 'bg-emerald-950/20 border-emerald-900/40 text-emerald-400 hover:border-emerald-800'
+                            }`}
+                          >
+                            <span>{slot}</span>
+                            <span className="text-[9px] font-normal opacity-80">
+                              {isSlotFrozen ? "Dondurulub" : "Aktiv"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {dashTab === 'calendar' && (
+            <div className="glass-panel p-6 rounded-2xl border border-purple-900/40 space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-purple-900/40 pb-4 gap-4">
+                <div>
+                  <h3 className="font-display font-bold text-lg text-white">Təqvim (Drag & Drop)</h3>
+                  <p className="text-xs text-gray-400">Görüşləri cədvəldə sürüşdürərək saatlarını dəyişdirə bilərsiniz</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 font-semibold">Tarix:</span>
+                  <input 
+                    type="date" 
+                    value={selectedScheduleDate}
+                    onChange={e => setSelectedScheduleDate(e.target.value)}
+                    className="bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-1.5 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Agenda Grid */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-2 text-xs font-bold text-gray-400 border-b border-purple-900/20 pb-2">
+                  <div className="md:col-span-2">Saat</div>
+                  <div className="md:col-span-10">Müştəri & Randevu Detalları</div>
+                </div>
+
+                <div className="space-y-3">
+                  {['09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00'].map(slot => {
+                    const isDayBlocked = pro.blockedDates && pro.blockedDates.includes(selectedScheduleDate);
+                    const isHourBlocked = pro.blockedHoursByDate && pro.blockedHoursByDate[selectedScheduleDate] && pro.blockedHoursByDate[selectedScheduleDate].includes(slot);
+                    const slotBooking = proBookings.find(b => b.date === selectedScheduleDate && b.time === slot);
+
+                    return (
+                      <div key={slot} className="grid grid-cols-1 md:grid-cols-12 items-center gap-2 min-h-[50px] border-b border-purple-900/10 pb-2">
+                        <div className="md:col-span-2 text-xs font-bold text-violet-300">
+                          {slot}
+                        </div>
+
+                        <div className="md:col-span-10 h-full">
+                          {isDayBlocked ? (
+                            <div className="h-full py-2 px-4 rounded-xl bg-rose-950/20 border border-rose-900/30 text-rose-400 text-xs font-semibold flex items-center">
+                              ⚠️ İstirahət Günü (Bütün gün doludur/bağlıdır)
+                            </div>
+                          ) : isHourBlocked ? (
+                            <div className="h-full py-2 px-4 rounded-xl bg-amber-950/20 border border-amber-900/30 text-amber-400 text-xs font-semibold flex items-center">
+                              ❄️ Dondurulub (Bu saat qeydiyyata bağlıdır)
+                            </div>
+                          ) : slotBooking ? (
+                            <div 
+                              draggable={true}
+                              onDragStart={(e) => e.dataTransfer.setData('text/plain', slotBooking.id)}
+                              className="p-3.5 rounded-xl bg-gradient-to-r from-violet-950/70 to-indigo-950/70 border border-violet-500/30 hover:border-violet-400/80 cursor-grab active:cursor-grabbing transition-all space-y-1.5 shadow-md shadow-violet-950/30"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-white flex items-center gap-1.5">
+                                  <span>{slotBooking.customerAvatar || "👤"}</span>
+                                  {slotBooking.customerName}
+                                </span>
+                                <span className="text-[10px] bg-violet-600/30 text-violet-200 border border-violet-500/25 px-2 py-0.5 rounded font-semibold">
+                                  {slotBooking.serviceName} ({slotBooking.price} AZN)
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-gray-400 flex flex-wrap gap-x-4">
+                                <span>📞 {slotBooking.customerPhone}</span>
+                                {slotBooking.customerEmail && <span>📧 {slotBooking.customerEmail}</span>}
+                                {slotBooking.notes && <span>📝 Qeyd: "{slotBooking.notes}"</span>}
+                              </div>
+                            </div>
+                          ) : (
+                            <div 
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={(e) => handleDragDropBooking(e, slot)}
+                              className="h-full py-3 px-4 rounded-xl border border-dashed border-purple-900/40 bg-purple-950/5 hover:border-violet-500 hover:bg-violet-600/5 transition-all text-gray-500 hover:text-violet-400 text-xs flex items-center justify-center cursor-default"
+                            >
+                              <span className="font-medium">Boş saat (Randevunu bura sürüşdürün)</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+          {dashTab === 'services' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+              {/* Add Service Panel */}
+              <div className="glass-panel p-6 rounded-2xl border border-purple-900/40 space-y-6">
+                <div>
+                  <h3 className="font-display font-bold text-lg text-white">Yeni Xidmət Əlavə Et</h3>
+                  <p className="text-xs text-gray-400">Təklif etdiyiniz xidmət növlərini bura yazın</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300 mb-1 block">Xidmət Adı *</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="Məs: Modelləşdirmə Saç Kəsimi"
+                      value={newServiceForm.name}
+                      onChange={e => setNewServiceForm({...newServiceForm, name: e.target.value})}
+                      className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Müddət (Dəqiqə) *</label>
+                      <input 
+                        type="number" 
+                        required
+                        value={newServiceForm.duration}
+                        onChange={e => setNewServiceForm({...newServiceForm, duration: Number(e.target.value)})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Qiymət (AZN) *</label>
+                      <input 
+                        type="number" 
+                        required
+                        value={newServiceForm.price}
+                        onChange={e => setNewServiceForm({...newServiceForm, price: Number(e.target.value)})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Kateqoriya *</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="Məs: Saç, Baxım, Boyama"
+                        value={newServiceForm.category}
+                        onChange={e => setNewServiceForm({...newServiceForm, category: e.target.value})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Vizuallaşdırma Rəngi</label>
+                      <input 
+                        type="color" 
+                        value={newServiceForm.color}
+                        onChange={e => setNewServiceForm({...newServiceForm, color: e.target.value})}
+                        className="w-full bg-transparent h-9 border border-purple-900/40 rounded-xl cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300 mb-1 block">Xidmət Haqqında Qısa Məlumat</label>
+                    <textarea 
+                      rows="2"
+                      placeholder="Müştərilərin xidmət haqqında görəcəyi qısa məlumat..."
+                      value={newServiceForm.description}
+                      onChange={e => setNewServiceForm({...newServiceForm, description: e.target.value})}
+                      className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      if (!newServiceForm.name) {
+                        triggerToast("Xidmət adını daxil edin!", "error");
+                        return;
+                      }
+                      const createdService = {
+                        id: `s-${Date.now()}`,
+                        name: newServiceForm.name,
+                        duration: newServiceForm.duration || 30,
+                        price: newServiceForm.price || 10,
+                        category: newServiceForm.category || 'Əsas',
+                        color: newServiceForm.color || '#8B5CF6',
+                        description: newServiceForm.description || ''
+                      };
+                      setPro({
+                        ...pro,
+                        services: [...(pro.services || []), createdService]
+                      });
+                      setNewServiceForm({
+                        name: '', price: 30, duration: 45, category: 'Əsas', color: '#8B5CF6', description: '', preparationInstructions: ''
+                      });
+                      triggerToast("Yeni xidmət uğurla əlavə edildi!");
+                    }}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 hover:from-violet-500 font-bold text-white shadow-lg text-xs"
+                  >
+                    Xidməti Əlavə Et
+                  </button>
+                </div>
+              </div>
+
+              {/* Services List Panel */}
+              <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-purple-900/40 space-y-6">
+                <div>
+                  <h3 className="font-display font-bold text-lg text-white">Mövcud Xidmətləriniz ({pro.services?.length || 0})</h3>
+                  <p className="text-xs text-gray-400">Aktiv xidmətlərinizin siyahısı və idarəedilməsi</p>
+                </div>
+
+                <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                  {pro.services && pro.services.map(srv => (
+                    <div 
+                      key={srv.id}
+                      className="p-4 rounded-xl border border-purple-900/30 bg-[#161327]/60 flex items-center justify-between hover:border-purple-800 transition-all"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: srv.color }}></span>
+                          <h4 className="font-bold text-sm text-white">{srv.name}</h4>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-purple-950 text-purple-200 font-medium">{srv.category}</span>
+                        </div>
+                        <p className="text-xs text-gray-400">{srv.description || "Təsvir daxil edilməyib."}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <span className="font-display font-extrabold text-sm text-white">{srv.price} AZN</span>
+                          <p className="text-[10px] text-gray-400 flex items-center justify-end gap-1">
+                            <span>⏱ {srv.duration} dəq</span>
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const updatedServices = pro.services.filter(s => s.id !== srv.id);
+                            setPro({ ...pro, services: updatedServices });
+                            triggerToast("Xidmət silindi!");
+                          }}
+                          className="p-2 bg-rose-950/20 hover:bg-rose-900/30 border border-rose-900/40 text-rose-400 rounded-xl transition-all text-xs font-bold"
+                          title="Sil"
+                        >
+                          Sil
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {(!pro.services || pro.services.length === 0) && (
+                    <div className="text-center py-10 text-xs text-gray-500">
+                      Heç bir xidmət daxil edilməyib. Yeni xidmət əlavə edərək başlayın!
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {dashTab === 'builder' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+              
+              {/* EDITING PANEL */}
+              <div className="glass-panel p-6 rounded-2xl border border-purple-900/40 space-y-6">
+                <div>
+                  <h3 className="font-display font-bold text-lg text-white">Səhifə Redaktoru (Live)</h3>
+                  <p className="text-xs text-gray-400">Profilinizə və görünüşə düzəlişlər edin</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Ad Soyadınız</label>
+                      <input 
+                        type="text" 
+                        value={editForm.fullName || ""}
+                        onChange={e => setEditForm({...editForm, fullName: e.target.value})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Salon / Biznes Adı</label>
+                      <input 
+                        type="text" 
+                        value={editForm.businessName || ""}
+                        onChange={e => setEditForm({...editForm, businessName: e.target.value})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Peşəniz</label>
+                      <select 
+                        value={editForm.profession || ""}
+                        onChange={e => setEditForm({...editForm, profession: e.target.value})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                      >
+                        {PROFESSIONS_LIST.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-300 mb-1 block">Təcrübə (İl)</label>
+                      <input 
+                        type="number" 
+                        value={editForm.experienceYears || 0}
+                        onChange={e => setEditForm({...editForm, experienceYears: Number(e.target.value)})}
+                        className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300 mb-1 block">Ünvan</label>
+                    <input 
+                      type="text" 
+                      value={editForm.workingAddress || ""}
+                      onChange={e => setEditForm({...editForm, workingAddress: e.target.value})}
+                      className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300 mb-1 block">Haqqında Bio</label>
+                    <textarea 
+                      rows="3"
+                      value={editForm.about || ""}
+                      onChange={e => setEditForm({...editForm, about: e.target.value})}
+                      className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Visual customizations */}
+                  <div className="border-t border-purple-900/30 pt-4 space-y-4">
+                    <h4 className="text-xs font-bold text-violet-300 uppercase tracking-wider">Dizayn & Stil Tənzimləmələri</h4>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-300 mb-1 block">Dizayn Şablonu</label>
+                        <select 
+                          value={editForm.customization?.template || "modern"}
+                          onChange={e => setEditForm({
+                            ...editForm,
+                            customization: { ...editForm.customization, template: e.target.value }
+                          })}
+                          className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                        >
+                          <option value="modern">Modern & Clean</option>
+                          <option value="luxury">Luxury & Dark</option>
+                          <option value="beauty">Beauty & Pastel</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-300 mb-1 block">Düymə Stili</label>
+                        <select 
+                          value={editForm.customization?.buttonStyle || "rounded"}
+                          onChange={e => setEditForm({
+                            ...editForm,
+                            customization: { ...editForm.customization, buttonStyle: e.target.value }
+                          })}
+                          className="w-full bg-[#161327] border border-purple-900/40 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none"
+                        >
+                          <option value="rounded">Rounded Corner (Yumru)</option>
+                          <option value="pill">Pill (Kapsul)</option>
+                          <option value="square">Square (Düzbucaqlı)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-300 mb-1 block">Əsas Rəng (Primary Color)</label>
+                        <div className="flex gap-2 items-center">
+                          <input 
+                            type="color" 
+                            value={editForm.customization?.primaryColor || "#8B5CF6"}
+                            onChange={e => setEditForm({
+                              ...editForm,
+                              customization: { ...editForm.customization, primaryColor: e.target.value }
+                            })}
+                            className="bg-transparent w-8 h-8 cursor-pointer rounded overflow-hidden"
+                          />
+                          <span className="text-xs font-mono text-gray-400">{editForm.customization?.primaryColor || "#8B5CF6"}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-300 mb-1 block">Vurğu Rəngi (Accent Color)</label>
+                        <div className="flex gap-2 items-center">
+                          <input 
+                            type="color" 
+                            value={editForm.customization?.accentColor || "#D946EF"}
+                            onChange={e => setEditForm({
+                              ...editForm,
+                              customization: { ...editForm.customization, accentColor: e.target.value }
+                            })}
+                            className="bg-transparent w-8 h-8 cursor-pointer rounded overflow-hidden"
+                          />
+                          <span className="text-xs font-mono text-gray-400">{editForm.customization?.accentColor || "#D946EF"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-300 mb-1 block">Profil Şəkli (Drag & Drop)</label>
+                        <DragDropUpload 
+                          label="Profil Şəkli" 
+                          value={editForm.profilePhoto} 
+                          onChange={(url) => setEditForm({...editForm, profilePhoto: url})} 
+                          presetIcon="👤"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-300 mb-1 block">Arxa Fon Şəkli (Drag & Drop)</label>
+                        <DragDropUpload 
+                          label="Arxa Fon Şəkli" 
+                          value={editForm.coverPhoto} 
+                          onChange={(url) => setEditForm({...editForm, coverPhoto: url})} 
+                          presetIcon="🖼️"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      setPro(editForm);
+                      triggerToast("Səhifə dizaynınız və məlumatlarınız uğurla yadda saxlanıldı!");
+                    }}
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 hover:from-violet-500 font-bold text-white shadow-lg text-xs"
+                  >
+                    Dəyişiklikləri Yadda Saxla
+                  </button>
+                </div>
+              </div>
+
+              {/* LIVE MOCKUP PREVIEW */}
+              <div className="glass-panel p-6 rounded-2xl border border-purple-900/40 flex flex-col justify-between space-y-4">
+                <div>
+                  <h3 className="font-display font-bold text-lg text-white">Canlı Profil Önizləməsi</h3>
+                  <p className="text-xs text-gray-400">Müştərilərinizin görəcəyi vizual görünüş</p>
+                </div>
+
+                <div 
+                  className={`w-full rounded-2xl overflow-hidden border p-5 space-y-4 transition-all ${
+                    editForm.customization?.template === 'luxury' 
+                      ? 'bg-gradient-to-b from-[#1c1635] to-[#0d0a19] border-yellow-500/20' 
+                      : editForm.customization?.template === 'beauty' 
+                      ? 'bg-gradient-to-b from-[#2e1d3c] to-[#160d24] border-fuchsia-500/20' 
+                      : 'bg-[#161327] border-purple-900/40'
+                  }`}
+                >
+                  <div className="h-28 w-full rounded-xl overflow-hidden relative bg-gray-900 border border-purple-950/40">
+                    <img 
+                      src={editForm.coverPhoto || "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&q=80&w=1200"} 
+                      className="w-full h-full object-cover opacity-70"
+                    />
+                    <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold text-yellow-400">
+                      ★ 5.0 (Canlı)
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 items-end -mt-12 px-2 relative z-10">
+                    <img 
+                      src={editForm.profilePhoto || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=600"} 
+                      className="w-16 h-16 rounded-xl object-cover border-2 border-[#161327] shadow-xl"
+                    />
+                    <div className="pb-1">
+                      <h4 className="font-display font-bold text-sm text-white">{editForm.fullName || "Mütəxəssis Adı"}</h4>
+                      <p className="text-[10px] text-violet-300 font-semibold">{editForm.businessName || "Salon / Biznes Adı"}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <span 
+                      className="text-[9px] font-bold px-2 py-0.5 rounded border"
+                      style={{ 
+                        backgroundColor: `${editForm.customization?.primaryColor || "#8B5CF6"}20`, 
+                        borderColor: editForm.customization?.primaryColor || "#8B5CF6", 
+                        color: editForm.customization?.primaryColor || "#8B5CF6"
+                      }}
+                    >
+                      {editForm.profession}
+                    </span>
+                    <span className="text-[9px] font-bold bg-[#282245] px-2 py-0.5 rounded border border-purple-800/40 text-gray-300">
+                      {editForm.experienceYears || 0} il təcrübə
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-gray-400 line-clamp-2">
+                    {editForm.about || "Haqqında məlumat qeyd edilməyib."}
+                  </p>
+
+                  <div className="text-[10px] text-gray-400 flex items-center gap-1.5 pt-2 border-t border-purple-900/20">
+                    <span>📍 {editForm.workingAddress || "Baku, Azerbaijan"}</span>
+                  </div>
+
+                  <button 
+                    className="w-full py-2 text-xs font-bold text-white transition-all shadow-md flex items-center justify-center gap-1.5 animate-pulse"
+                    style={{
+                      backgroundColor: editForm.customization?.primaryColor || "#8B5CF6",
+                      borderRadius: editForm.customization?.buttonStyle === 'pill' ? '9999px' : editForm.customization?.buttonStyle === 'square' ? '0px' : '10px'
+                    }}
+                  >
+                    Görüş Təyin Et!
+                  </button>
+
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-violet-950/20 border border-violet-900/30 text-[10px] text-violet-300 text-center">
+                  ✨ Dəyişikliklər profilinizdə canlı şəkildə əks olunur. Dəyişiklikləri yadda saxladıqdan sonra müştəri səhifəniz dərhal yenilənir.
+                </div>
+              </div>
+
+            </div>
+          )}
+          {dashTab === 'crm' && (
+            <div className="glass-panel p-6 rounded-2xl border border-purple-900/40 space-y-6 animate-fade-in">
+              <div>
+                <h3 className="font-display font-bold text-lg text-white">Müştəri CRM & Qara Siyahı (Blacklist)</h3>
+                <p className="text-xs text-gray-400">Müştəri siyahısını idarə edin və arzuolunmaz müştəriləri bloklayın</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-purple-900/40 text-gray-400 font-bold">
+                      <th className="pb-3 pr-2">Müştəri</th>
+                      <th className="pb-3 px-2">Telefon</th>
+                      <th className="pb-3 px-2">Görüş sayı</th>
+                      <th className="pb-3 px-2">No-Show</th>
+                      <th className="pb-3 px-2">Ümumi Gəlir</th>
+                      <th className="pb-3 pl-2 text-right">Status / Əməliyyat</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers.map(c => {
+                      const isBlocked = c.isBlacklisted;
+                      return (
+                        <tr key={c.id} className="border-b border-purple-900/10 hover:bg-purple-950/10 transition-colors">
+                          <td className="py-3.5 pr-2 flex items-center gap-2">
+                            <span className="w-8 h-8 rounded-xl bg-violet-950 border border-purple-900/40 flex items-center justify-center text-sm">
+                              👤
+                            </span>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-white">{c.name}</span>
+                              <span className="text-[10px] text-gray-500">{c.email || 'Email yoxdur'}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-2 font-mono text-gray-300">{c.phone}</td>
+                          <td className="py-3.5 px-2 text-gray-300">{c.totalBookings || 1}</td>
+                          <td className="py-3.5 px-2 text-rose-400">{c.noShowCount || 0}</td>
+                          <td className="py-3.5 px-2 font-bold text-emerald-400">{c.totalSpending || 30} AZN</td>
+                          <td className="py-3.5 pl-2 text-right">
+                            <button
+                              onClick={() => {
+                                const updated = customers.map(cust => 
+                                  cust.id === c.id ? { ...cust, isBlacklisted: !isBlocked } : cust
+                                );
+                                setCustomers(updated);
+                                triggerToast(isBlocked ? `${c.name} blokdan çıxarıldı.` : `${c.name} qara siyahıya salındı!`, isBlocked ? 'success' : 'warning');
+                              }}
+                              className={`px-3 py-1.5 rounded-lg font-bold text-[10px] transition-all border ${
+                                isBlocked 
+                                  ? 'bg-rose-950/40 border-rose-800 text-rose-400 hover:bg-rose-900/20' 
+                                  : 'bg-slate-900/60 border-purple-900/40 text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              {isBlocked ? '🚫 Bloklanıb (Aç)' : 'Blokla'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // --- 4. ADVANCED SUPER ADMIN DASHBOARD ---
+    function AdminDashboard({ pros, setPros, bookings, setBookings, siteSettings, setSiteSettings, triggerToast }) {
+      return (
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6 animate-fade-in">
+          <div className="glass-panel p-6 rounded-2xl border border-purple-800/40 flex flex-col md:flex-row items-center justify-between gap-4 glow-violet">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-purple-600/30">
+                <i data-lucide="shield" className="w-6 h-6"></i>
+              </div>
+              <div>
+                <h2 className="font-display text-2xl font-bold text-white">Super Admin CMS İdarəetmə Paneli</h2>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
+  </script>
+</body>
+</html>

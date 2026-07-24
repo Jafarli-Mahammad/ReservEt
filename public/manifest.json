@@ -1,0 +1,21 @@
+{
+  "short_name": "Rezerv.az",
+  "name": "Rezerv.az - Onlayn Görüş Təyinatı və CRM Platforması",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=192&h=192&fit=crop",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=512&h=512&fit=crop",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0B0F17",
+  "theme_color": "#0EA5E9",
+  "display": "standalone",
+  "orientation": "portrait"
+}
